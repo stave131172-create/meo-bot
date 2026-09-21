@@ -17,7 +17,7 @@ if (mongoURI) {
     mongoose.connect(mongoURI)
         .then(() => console.log('✅ Đã kết nối thành công với cơ sở dữ liệu MongoDB!'))
         .catch(err => console.error('❌ Lỗi kết nối MongoDB:', err));
-} else {
+} else {	
     console.warn('⚠️ Chưa cấu hình MONGODB_URI trong biến môi trường!');
 }
 
@@ -68,11 +68,11 @@ let currentWildCat = null;
 
 const CAT_TYPES = [
     { name: 'Mèo Béo Phơi Nắng 🐱', rarity: 'Thường', rate: 30, image: 'https://i.pinimg.com/736x/09/04/14/0904144cabdfd4e01784bf064d56d290.jpg' },
-    { name: 'Mèo Ta 🐾', rarity: 'Thường', rate: 25, image: 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=500' },
+    { name: 'Mèo Ta 🐾', rarity: 'Thường', rate: 25, image: 'https://i.pinimg.com/736x/ce/04/8c/ce048c234c179b17841811151df5259c.jpg' },
     { name: 'Mèo Trà Xanh 🍵', rarity: 'Hiếm', rate: 15, image: 'https://i.pinimg.com/736x/a2/06/ad/a206ad186aed59dff16bbce4bdff424b.jpg' },
-    { name: 'Mèo Anh Lông Ngắn 🐱', rarity: 'Hiếm', rate: 12, image: 'https://images.unsplash.com/photo-1573865526739-10659fec78a5?w=500' },
+    { name: 'Mèo Anh Lông Ngắn 🐱', rarity: 'Hiếm', rate: 12, image: 'https://i.pinimg.com/736x/47/98/2b/47982b1d70bac5ce044ead6bc1e18fe2.jpg' },
     { name: 'Mèo Lofi Nghe Nhạc 🎧', rarity: 'Cực Hiếm', rate: 10, image: 'https://i.pinimg.com/736x/b3/12/89/b3128925bda713b4303f89b9c2d62744.jpg' },
-    { name: 'Mèo Anh Lông Dài 🦁', rarity: 'Cực Hiếm', rate: 5, image: 'https://images.unsplash.com/photo-1533738363-b7f9aef128ce?w=500' },
+    { name: 'Mèo Anh Lông Dài 🦁', rarity: 'Cực Hiếm', rate: 5, image: 'https://i.pinimg.com/736x/0e/09/90/0e09907cf9dccf5e15816bcc01f308dd.jpg' },
     { name: 'Mèo Hoàng Gia ✨', rarity: 'Huyền Thoại', rate: 3, image: 'https://i.pinimg.com/736x/ce/04/8c/ce048c234c179b17841811151df5259c.jpg' },
 ];
 
