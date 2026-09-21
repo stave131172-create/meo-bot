@@ -1,12 +1,49 @@
 import http from 'http';
 import { Client, GatewayIntentBits, EmbedBuilder } from 'discord.js';
 import dotenv from 'dotenv';
+import mongoose from 'mongoose';
 
-// Tạo Web Server để Render giữ service sống
+// Tạo Web Server giữ Render không ngủ
 http.createServer((req, res) => res.end('Bot Meo va Tra is running!')).listen(process.env.PORT || 3000);
 
 dotenv.config();
 
+// ==================== KẾT NỐI MONGODB (LƯU DỮ LIỆU VĨNH VIỄN) ====================
+const mongoURI = process.env.MONGODB_URI;
+if (mongoURI) {
+    mongoose.connect(mongoURI)
+        .then(() => console.log('✅ Đã kết nối thành công với cơ sở dữ liệu MongoDB!'))
+        .catch(err => console.error('❌ Lỗi kết nối MongoDB:', err));
+} else {
+    console.warn('⚠️ Chưa cấu hình MONGODB_URI trong biến môi trường!');
+}
+
+// Định nghĩa khung dữ liệu người dùng (Schema)
+const userSchema = new mongoose.Schema({
+    userId: { type: String, required: true, unique: true },
+    coins: { type: Number, default: 100 },
+    cats: { type: Array, default: [] },
+    inventory: { type: Object, default: { hatgiong_tra: 2, thucAn: 2 } },
+    maxPlots: { type: Number, default: 5 },
+    plotsUsed: { type: Number, default: 0 },
+    unlockedRecipes: { type: Array, default: [] },
+    lastDiemDanh: { type: Number, default: 0 },
+    lastKiemTienPet: { type: Number, default: 0 }
+});
+
+const User = mongoose.model('User', userSchema);
+
+// Hàm lấy dữ liệu người dùng từ Database (hoặc tạo mới nếu chưa có)
+async function getUser(userId) {
+    let user = await User.findOne({ userId });
+    if (!user) {
+        user = new User({ userId });
+        await user.save();
+    }
+    return user;
+}
+
+// ==================== CAU HINH BOT DISCORD ====================
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -18,91 +55,30 @@ const client = new Client({
 const PREFIX = '!';
 let SPAWN_CHANNEL_ID = null;
 let currentWildCat = null;
-const usersData = new Map();
 
-// Danh sách Mèo (Đã cập nhật ảnh mới & các loại mèo mới)
+// Danh sách Mèo
 const CAT_TYPES = [
-    { 
-        name: 'Mèo Béo Phơi Nắng 🐱', 
-        rarity: 'Thường', 
-        rate: 30,
-        image: 'https://i.pinimg.com/736x/09/04/14/0904144cabdfd4e01784bf064d56d290.jpg' 
-    },
-    { 
-        name: 'Mèo Ta 🐾', 
-        rarity: 'Thường', 
-        rate: 25,
-        image: 'https://i.pinimg.com/736x/3f/c2/e3/3fc2e35d16bb14fb953b62b7703acc6d.jpg' 
-    },
-    { 
-        name: 'Mèo Trà Xanh 🍵', 
-        rarity: 'Hiếm', 
-        rate: 15,
-        image: 'https://i.pinimg.com/736x/a2/06/ad/a206ad186aed59dff16bbce4bdff424b.jpg' 
-    },
-    { 
-        name: 'Mèo Anh Lông Ngắn 🐱', 
-        rarity: 'Hiếm', 
-        rate: 12,
-        image: 'https://i.pinimg.com/736x/47/98/2b/47982b1d70bac5ce044ead6bc1e18fe2.jpg' 
-    },
-    { 
-        name: 'Mèo Lofi Nghe Nhạc 🎧', 
-        rarity: 'Cực Hiếm', 
-        rate: 10,
-        image: 'https://i.pinimg.com/736x/b3/12/89/b3128925bda713b4303f89b9c2d62744.jpg' 
-    },
-    { 
-        name: 'Mèo Anh Lông Dài 🦁', 
-        rarity: 'Cực Hiếm', 
-        rate: 5,
-        image: 'https://i.pinimg.com/736x/0e/09/90/0e09907cf9dccf5e15816bcc01f308dd.jpg' 
-    },
-    { 
-        name: 'Mèo Hoàng Gia ✨', 
-        rarity: 'Huyền Thoại', 
-        rate: 3,
-        image: 'https://i.pinimg.com/736x/ce/04/8c/ce048c234c179b17841811151df5259c.jpg' 
-    },
+    { name: 'Mèo Béo Phơi Nắng 🐱', rarity: 'Thường', rate: 30, image: 'https://i.pinimg.com/736x/09/04/14/0904144cabdfd4e01784bf064d56d290.jpg' },
+    { name: 'Mèo Ta 🐾', rarity: 'Thường', rate: 25, image: 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=500' },
+    { name: 'Mèo Trà Xanh 🍵', rarity: 'Hiếm', rate: 15, image: 'https://i.pinimg.com/736x/a2/06/ad/a206ad186aed59dff16bbce4bdff424b.jpg' },
+    { name: 'Mèo Anh Lông Ngắn 🐱', rarity: 'Hiếm', rate: 12, image: 'https://images.unsplash.com/photo-1573865526739-10659fec78a5?w=500' },
+    { name: 'Mèo Lofi Nghe Nhạc 🎧', rarity: 'Cực Hiếm', rate: 10, image: 'https://i.pinimg.com/736x/b3/12/89/b3128925bda713b4303f89b9c2d62744.jpg' },
+    { name: 'Mèo Anh Lông Dài 🦁', rarity: 'Cực Hiếm', rate: 5, image: 'https://images.unsplash.com/photo-1533738363-b7f9aef128ce?w=500' },
+    { name: 'Mèo Hoàng Gia ✨', rarity: 'Huyền Thoại', rate: 3, image: 'https://i.pinimg.com/736x/ce/04/8c/ce048c234c179b17841811151df5259c.jpg' },
 ];
 
-// Thông tin các loại cây trồng
 const PLANTS = {
-    tra: { name: 'Cây Trà', seedItem: 'hatgiong_tra', cropItem: 'la_tra', cropName: 'Lá Trà', timeMs: 30000, seedPrice: 20, sellPrice: 35 },
-    caphe: { name: 'Cây Cà Phê', seedItem: 'hatgiong_caphe', cropItem: 'hat_caphe', cropName: 'Hạt Cà Phê', timeMs: 45000, seedPrice: 30, sellPrice: 55 },
-    lua: { name: 'Cây Lúa', seedItem: 'hatgiong_lua', cropItem: 'lúa', cropName: 'Lúa', timeMs: 20000, seedPrice: 10, sellPrice: 18 },
-    tre: { name: 'Cây Tre', seedItem: 'hatgiong_tre', cropItem: 'than_tre', cropName: 'Thân Tre', timeMs: 60000, seedPrice: 50, sellPrice: 95 },
-    mia: { name: 'Cây Mía', seedItem: 'hatgiong_mia', cropItem: 'cay_mia', cropName: 'Cây Mía', timeMs: 40000, seedPrice: 25, sellPrice: 45 },
+    tra: { name: 'Cây Trà', seedItem: 'hatgiong_tra', cropItem: 'la_tra', cropName: 'Lá Trà', timeMs: 30000 },
+    caphe: { name: 'Cây Cà Phê', seedItem: 'hatgiong_caphe', cropItem: 'hat_caphe', cropName: 'Hạt Cà Phê', timeMs: 45000 },
+    lua: { name: 'Cây Lúa', seedItem: 'hatgiong_lua', cropItem: 'lua', cropName: 'Lúa', timeMs: 20000 },
+    tre: { name: 'Cây Tre', seedItem: 'hatgiong_tre', cropItem: 'than_tre', cropName: 'Thân Tre', timeMs: 60000 },
+    mia: { name: 'Cây Mía', seedItem: 'hatgiong_mia', cropItem: 'cay_mia', cropName: 'Cây Mía', timeMs: 40000 },
 };
 
-// Thông tin các món đồ bán được
 const ITEMS_SELL_PRICE = {
-    la_tra: 35,
-    hat_caphe: 55,
-    lua: 18,
-    than_tre: 95,
-    cay_mia: 45,
-    coc_tra: 180,
-    coc_caphe: 280,
-    coc_nuocmia: 220,
-    tra_dao: 500,
+    la_tra: 35, hat_caphe: 55, lua: 18, than_tre: 95, cay_mia: 45,
+    coc_tra: 180, coc_caphe: 280, coc_nuocmia: 220, tra_dao: 500
 };
-
-function getUser(userId) {
-    if (!usersData.has(userId)) {
-        usersData.set(userId, {
-            coins: 100,
-            cats: [],
-            inventory: { hatgiong_tra: 2, thucAn: 2 },
-            maxPlots: 5,
-            plotsUsed: 0,
-            unlockedRecipes: [], // Công thức mua trong shop
-            lastDiemDanh: 0,
-            lastKiemTienPet: 0
-        });
-    }
-    return usersData.get(userId);
-}
 
 client.once('ready', () => {
     console.log(`✅ Bot chill Node.js ${client.user.tag} đã sẵn sàng!`);
@@ -147,13 +123,15 @@ client.on('messageCreate', async (message) => {
     const args = content.startsWith(PREFIX) ? content.slice(PREFIX.length).trim().split(/ +/) : [content];
     const command = args.shift().toLowerCase();
 
-    // Lệnh Bắt Mèo (!cat / !meo)
+    // Bắt mèo
     if (command === 'cat' || command === 'meo') {
         if (currentWildCat) {
             const catCaught = currentWildCat;
             currentWildCat = null;
-            const user = getUser(message.author.id);
+            const user = await getUser(message.author.id);
             user.cats.push({ name: catCaught.name, level: 1 });
+            user.markModified('cats');
+            await user.save();
 
             const embed = new EmbedBuilder()
                 .setTitle('🎉 Bạn đã bắt thành công!')
@@ -169,45 +147,30 @@ client.on('messageCreate', async (message) => {
         }
     }
 
-    // Lệnh !help
+    // Help
     if (command === 'help' || command === 'h') {
         const embed = new EmbedBuilder()
             .setTitle('🍵 Hướng Dẫn Sử Dụng Bot Mèo Và Trà')
-            .setDescription('Dưới đây là danh sách toàn bộ các lệnh (có hỗ trợ lệnh viết tắt):')
+            .setDescription('Dữ liệu của bạn hiện đã được lưu an toàn 24/7!')
             .setColor(0x98FB98)
             .addFields(
-                { 
-                    name: '🐾 **Hệ Thống Mèo**', 
-                    value: '• `!cat` | `!meo`: Bắt mèo lang thang xuất hiện.\n• `!choan <STT>` | `!ca <STT>`: Cho mèo ăn tăng level.\n• `!kiemtien` | `!kt`: Nhận xu thưởng từ level của đàn mèo (1h/lần).' 
-                },
-                { 
-                    name: '🌱 **Nông Trại & Trồng Cây**', 
-                    value: '• `!trong <loại> <số_lượng>` | `!tr`: Trồng cây (tra, caphe, lua, tre, mia).\n• `!muadat`: Mua thêm 1 ô đất trồng cây (200 xu).\n• `!phache <loại>` | `!pha`: Pha nước uống từ nông sản (mất 1 phút).' 
-                },
-                { 
-                    name: '🏪 **Cửa Hàng, Mua & Bán**', 
-                    value: '• `!shop` | `!s`: Xem cửa hàng mua hạt giống & công thức.\n• `!mua <tên> [số_lượng]`: Mua vật phẩm.\n• `!ban <tên_món> <số_lượng>` | `!b`: Bán nông sản/nước uống lấy xu.\n• `!tui` | `!t`: Xem hành trang, nông sản và ổ mèo.\n• `!diemdanh` | `!dd`: Điểm danh nhận xu hàng ngày (24h/lần).' 
-                },
-                { 
-                    name: '⚙️ **Quản Lý**', 
-                    value: '• `!setchannel`: Đặt kênh hiện tại làm nơi mèo ghé thăm.' 
-                }
+                { name: '🐾 **Hệ Thống Mèo**', value: '• `!cat` | `!meo`: Bắt mèo lang thang xuất hiện.\n• `!choan <STT>` | `!ca <STT>`: Cho mèo ăn tăng level.\n• `!kiemtien` | `!kt`: Nhận xu thưởng từ đàn mèo (1h/lần).' },
+                { name: '🌱 **Nông Trại & Trồng Cây**', value: '• `!trong <loại> <số_lượng>` | `!tr`: Trồng cây (tra, caphe, lua, tre, mia).\n• `!muadat`: Mua thêm 1 ô đất (200 xu).\n• `!phache <loại>` | `!pha`: Pha nước uống từ nông sản.' },
+                { name: '🏪 **Cửa Hàng, Mua & Bán**', value: '• `!shop` | `!s`: Xem cửa hàng.\n• `!mua <tên> [số_lượng]`: Mua vật phẩm.\n• `!ban <tên_món> <số_lượng>` | `!b`: Bán nông sản/nước uống.\n• `!tui` | `!t`: Xem túi đồ và ổ mèo.\n• `!diemdanh` | `!dd`: Điểm danh nhận xu hàng ngày.' }
             );
 
         return message.channel.send({ embeds: [embed] });
     }
 
     if (command === 'setchannel') {
-        if (!message.member.permissions.has('Administrator')) {
-            return message.reply('❌ Bạn cần quyền Admin để dùng lệnh này!');
-        }
+        if (!message.member.permissions.has('Administrator')) return message.reply('❌ Bạn cần quyền Admin!');
         SPAWN_CHANNEL_ID = message.channel.id;
-        return message.channel.send(`🍵 Đã đặt kênh ${message.channel} làm nơi mèo ghé thăm mỗi 5 phút!`);
+        return message.channel.send(`🍵 Đã đặt kênh ${message.channel} làm nơi mèo ghé thăm!`);
     }
 
-    // Lệnh điểm danh (!diemdanh / !dd)
+    // Điểm danh
     if (command === 'diemdanh' || command === 'dd') {
-        const user = getUser(message.author.id);
+        const user = await getUser(message.author.id);
         const now = Date.now();
         const cooldown = 24 * 60 * 60 * 1000;
 
@@ -215,21 +178,21 @@ client.on('messageCreate', async (message) => {
             const timeLeft = cooldown - (now - user.lastDiemDanh);
             const hoursLeft = Math.floor(timeLeft / (1000 * 60 * 60));
             const minutesLeft = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
-            return message.reply(`⏰ Bạn đã điểm danh hôm nay rồi! Vui lòng quay lại sau **${hoursLeft} giờ ${minutesLeft} phút** nữa.`);
+            return message.reply(`⏰ Bạn đã điểm danh rồi! Vui lòng quay lại sau **${hoursLeft} giờ ${minutesLeft} phút** nữa.`);
         }
 
         user.lastDiemDanh = now;
         const reward = Math.floor(Math.random() * 51) + 50;
         user.coins += reward;
+        await user.save();
+
         return message.channel.send(`🍵 ${message.author} vừa uống trà và nhận được **${reward} xu**!`);
     }
 
-    // Lệnh kiếm tiền từ pet (!kiemtien / !kt)
+    // Kiếm tiền
     if (command === 'kiemtien' || command === 'kt') {
-        const user = getUser(message.author.id);
-        if (user.cats.length === 0) {
-            return message.reply('😿 Bạn chưa nuôi con mèo nào để kiếm tiền cả!');
-        }
+        const user = await getUser(message.author.id);
+        if (user.cats.length === 0) return message.reply('😿 Bạn chưa nuôi con mèo nào!');
 
         const now = Date.now();
         const cooldown = 60 * 60 * 1000;
@@ -237,8 +200,7 @@ client.on('messageCreate', async (message) => {
         if (now - user.lastKiemTienPet < cooldown) {
             const timeLeft = cooldown - (now - user.lastKiemTienPet);
             const minutesLeft = Math.floor(timeLeft / (1000 * 60));
-            const secondsLeft = Math.floor((timeLeft % (1000 * 60)) / 1000);
-            return message.reply(`⏰ Các con mèo đang nghỉ ngơi! Quay lại kiếm tiền sau **${minutesLeft} phút ${secondsLeft} giây**.`);
+            return message.reply(`⏰ Đàn mèo đang nghỉ ngơi! Quay lại kiếm tiền sau **${minutesLeft} phút**.`);
         }
 
         const totalLevel = user.cats.reduce((sum, cat) => sum + cat.level, 0);
@@ -246,144 +208,124 @@ client.on('messageCreate', async (message) => {
 
         user.lastKiemTienPet = now;
         user.coins += earnedCoins;
+        await user.save();
 
-        return message.channel.send(`🐾 Đàn mèo của ${message.author} (Tổng Level: **${totalLevel}**) vừa làm nũng mang về **${earnedCoins} xu**!`);
+        return message.channel.send(`🐾 Đàn mèo của ${message.author} mang về **${earnedCoins} xu**!`);
     }
 
-    // Lệnh Trồng Cây (!trong / !tr)
+    // Trồng cây
     if (command === 'trong' || command === 'tr') {
-        const user = getUser(message.author.id);
+        const user = await getUser(message.author.id);
         const plantKey = args[0]?.toLowerCase();
         const quantity = parseInt(args[1]) || 1;
 
-        if (!plantKey || !PLANTS[plantKey]) {
-            return message.reply('🌱 Loại cây không hợp lệ! Các loại cây có thể trồng: `tra`, `caphe`, `lua`, `tre`, `mia`. (Ví dụ: `!trong tra 2`)');
-        }
-
-        if (quantity <= 0 || isNaN(quantity)) {
-            return message.reply('❌ Số lượng cây trồng phải lớn hơn 0!');
-        }
+        if (!plantKey || !PLANTS[plantKey]) return message.reply('🌱 Cây không hợp lệ (`tra`, `caphe`, `lua`, `tre`, `mia`).');
+        if (quantity <= 0 || isNaN(quantity)) return message.reply('❌ Số lượng phải lớn hơn 0!');
 
         const plantInfo = PLANTS[plantKey];
         const currentSeedCount = user.inventory[plantInfo.seedItem] || 0;
 
         if (currentSeedCount < quantity) {
-            return message.reply(`❌ Bạn không đủ hạt giống! Cần **${quantity}** ${plantInfo.seedItem} (Hiện có: ${currentSeedCount}). Gõ \`!shop\` để mua.`);
+            return message.reply(`❌ Bạn không đủ hạt giống! Cần **${quantity}** ${plantInfo.seedItem}.`);
         }
 
         const availablePlots = user.maxPlots - user.plotsUsed;
         if (availablePlots < quantity) {
-            return message.reply(`❌ Vườn không đủ chỗ! Bạn chỉ còn **${availablePlots} ô đất trống** (Đã dùng ${user.plotsUsed}/${user.maxPlots} ô). Gõ \`!muadat\` để mở thêm ô đất.`);
+            return message.reply(`❌ Vườn không đủ chỗ! Còn **${availablePlots} ô đất trống**.`);
         }
 
-        // Trừ hạt giống & chiếm ô đất
         user.inventory[plantInfo.seedItem] -= quantity;
         user.plotsUsed += quantity;
+        user.markModified('inventory');
+        await user.save();
 
-        const timeInSec = plantInfo.timeMs / 1000;
-        await message.channel.send(`🌱 ${message.author} đã gieo **${quantity} ${plantInfo.name}**! Vườn còn ${user.maxPlots - user.plotsUsed} ô trống. Đợi **${timeInSec} giây** để thu hoạch...`);
+        await message.channel.send(`🌱 ${message.author} đã gieo **${quantity} ${plantInfo.name}**! Đợi **${plantInfo.timeMs / 1000} giây**...`);
 
-        setTimeout(() => {
-            user.plotsUsed -= quantity;
-            if (!user.inventory[plantInfo.cropItem]) user.inventory[plantInfo.cropItem] = 0;
-            user.inventory[plantInfo.cropItem] += quantity;
+        setTimeout(async () => {
+            const u = await getUser(message.author.id);
+            u.plotsUsed -= quantity;
+            if (!u.inventory[plantInfo.cropItem]) u.inventory[plantInfo.cropItem] = 0;
+            u.inventory[plantInfo.cropItem] += quantity;
+            u.markModified('inventory');
+            await u.save();
 
-            message.channel.send(`🍃 ${message.author} ơi! **${quantity} ${plantInfo.name}** đã chín! Bạn thu hoạch được **${quantity} ${plantInfo.cropName}** vào túi đồ (Gõ \`!tui\` để xem).`);
+            message.channel.send(`🍃 ${message.author} ơi! **${quantity} ${plantInfo.name}** đã chín! Thu hoạch thành công!`);
         }, plantInfo.timeMs);
     }
 
-    // Lệnh Mua Đất (!muadat)
+    // Mua đất
     if (command === 'muadat') {
-        const user = getUser(message.author.id);
-        const cost = 200;
-        if (user.coins < cost) return message.reply(`❌ Bạn cần **${cost} xu** để mua thêm 1 ô đất! (Hiện có: ${user.coins} xu).`);
+        const user = await getUser(message.author.id);
+        if (user.coins < 200) return message.reply(`❌ Cần **200 xu** để mua thêm 1 ô đất!`);
 
-        user.coins -= cost;
+        user.coins -= 200;
         user.maxPlots += 1;
-        return message.reply(`🏡 Bạn đã mua thêm 1 ô đất! Tối đa hiện tại có thể trồng: **${user.maxPlots} cây cùng lúc**.`);
+        await user.save();
+        return message.reply(`🏡 Bạn đã mở rộng vườn thành **${user.maxPlots} ô đất**!`);
     }
 
-    // Lệnh Pha Chế (!phache / !pha)
+    // Pha chế
     if (command === 'phache' || command === 'pha') {
-        const user = getUser(message.author.id);
+        const user = await getUser(message.author.id);
         const recipe = args[0]?.toLowerCase();
 
-        if (!recipe) {
-            return message.reply('🍵 Nhập món muốn pha! Ví dụ:\n• `!phache tra`: 10 Lá Trà -> 1 Cốc Trà\n• `!phache caphe`: 10 Hạt Cà Phê -> 1 Cốc Cà Phê\n• `!phache nuocmia`: 10 Cây Mía -> 1 Cốc Nước Mía\n• `!phache tradao`: 10 Lá Trà + Công thức Trà Đào -> 1 Trà Đào Cam Sả');
-        }
+        if (!recipe) return message.reply('🍵 Nhập món muốn pha: `tra`, `caphe`, `nuocmia`, `tradao`.');
 
-        let reqItem = '';
-        let reqAmount = 10;
-        let resultItem = '';
-        let resultName = '';
+        let reqItem = '', reqAmount = 10, resultItem = '', resultName = '';
 
-        if (recipe === 'tra') {
-            reqItem = 'la_tra';
-            resultItem = 'coc_tra';
-            resultName = 'Cốc Trà Xanh';
-        } else if (recipe === 'caphe') {
-            reqItem = 'hat_caphe';
-            resultItem = 'coc_caphe';
-            resultName = 'Cốc Cà Phê';
-        } else if (recipe === 'nuocmia') {
-            reqItem = 'cay_mia';
-            resultItem = 'coc_nuocmia';
-            resultName = 'Cốc Nước Mía';
-        } else if (recipe === 'tradao') {
-            if (!user.unlockedRecipes.includes('tradao')) {
-                return message.reply('🔒 Bạn chưa mở khóa công thức **Trà Đào Cam Sả**! Hãy vào `!shop` để mua công thức trước.');
-            }
-            reqItem = 'la_tra';
-            resultItem = 'tra_dao';
-            resultName = 'Trà Đào Cam Sả Thượng Hạng';
-        } else {
-            return message.reply('❌ Món pha chế không hợp lệ!');
-        }
+        if (recipe === 'tra') { reqItem = 'la_tra'; resultItem = 'coc_tra'; resultName = 'Cốc Trà Xanh'; }
+        else if (recipe === 'caphe') { reqItem = 'hat_caphe'; resultItem = 'coc_caphe'; resultName = 'Cốc Cà Phê'; }
+        else if (recipe === 'nuocmia') { reqItem = 'cay_mia'; resultItem = 'coc_nuocmia'; resultName = 'Cốc Nước Mía'; }
+        else if (recipe === 'tradao') {
+            if (!user.unlockedRecipes.includes('tradao')) return message.reply('🔒 Chưa mở khóa công thức này trong `!shop`!');
+            reqItem = 'la_tra'; resultItem = 'tra_dao'; resultName = 'Trà Đào Cam Sả';
+        } else return message.reply('❌ Món pha chế không hợp lệ!');
 
         const currentHave = user.inventory[reqItem] || 0;
-        if (currentHave < reqAmount) {
-            return message.reply(`❌ Bạn cần ít nhất **${reqAmount} ${reqItem}** để pha chế món này (Hiện có: ${currentHave}).`);
-        }
+        if (currentHave < reqAmount) return message.reply(`❌ Cần **${reqAmount} ${reqItem}** (Hiện có: ${currentHave}).`);
 
         user.inventory[reqItem] -= reqAmount;
-        await message.channel.send(`🍵 ${message.author} đang tiến hành pha chế **${resultName}**... Vui lòng đợi **1 phút (60s)**!`);
+        user.markModified('inventory');
+        await user.save();
 
-        setTimeout(() => {
-            if (!user.inventory[resultItem]) user.inventory[resultItem] = 0;
-            user.inventory[resultItem] += 1;
-            message.channel.send(`✨ **Pha chế thành công!** ${message.author} đã nhận được **1 ${resultName}** vào túi đồ! Bán món này được rất nhiều tiền đó!`);
+        await message.channel.send(`🍵 ${message.author} đang pha **${resultName}**... Vui lòng đợi **1 phút**!`);
+
+        setTimeout(async () => {
+            const u = await getUser(message.author.id);
+            if (!u.inventory[resultItem]) u.inventory[resultItem] = 0;
+            u.inventory[resultItem] += 1;
+            u.markModified('inventory');
+            await u.save();
+
+            message.channel.send(`✨ **Pha chế thành công!** ${message.author} nhận được **1 ${resultName}**!`);
         }, 60000);
     }
 
-    // Lệnh Bán Nông Sản / Nước Uống (!ban / !b)
+    // Bán đồ
     if (command === 'ban' || command === 'b') {
-        const user = getUser(message.author.id);
+        const user = await getUser(message.author.id);
         const itemKey = args[0]?.toLowerCase();
         const quantity = parseInt(args[1]) || 1;
 
-        if (!itemKey || !ITEMS_SELL_PRICE[itemKey]) {
-            return message.reply('❌ Tên món hàng không hợp lệ! Nhập tên món cần bán (Ví dụ: `!ban la_tra 5`, `!ban coc_tra 1`). Các món bán được: `la_tra`, `hat_caphe`, `lua`, `than_tre`, `cay_mia`, `coc_tra`, `coc_caphe`, `coc_nuocmia`, `tra_dao`.');
-        }
+        if (!itemKey || !ITEMS_SELL_PRICE[itemKey]) return message.reply('❌ Tên món không hợp lệ!');
 
         const currentCount = user.inventory[itemKey] || 0;
-        if (currentCount < quantity) {
-            return message.reply(`❌ Bạn không đủ **${itemKey}** để bán! (Hiện có: ${currentCount}).`);
-        }
+        if (currentCount < quantity) return message.reply(`❌ Không đủ **${itemKey}** để bán (Có: ${currentCount}).`);
 
-        const pricePerUnit = ITEMS_SELL_PRICE[itemKey];
-        const totalPrice = pricePerUnit * quantity;
-
+        const totalPrice = ITEMS_SELL_PRICE[itemKey] * quantity;
         user.inventory[itemKey] -= quantity;
         user.coins += totalPrice;
+        user.markModified('inventory');
+        await user.save();
 
         return message.reply(`💰 Bạn đã bán **${quantity} ${itemKey}** thu về **${totalPrice} xu**!`);
     }
 
-    // Lệnh Túi Đồ (!tui / !t)
+    // Túi đồ
     if (command === 'tui' || command === 't') {
-        const user = getUser(message.author.id);
+        const user = await getUser(message.author.id);
         const catList = user.cats.length > 0 
-            ? user.cats.map((c, index) => `**${index + 1}.** ${c.name} (Lv.${c.level})`).join('\n') 
+            ? user.cats.map((c, i) => `**${i + 1}.** ${c.name} (Lv.${c.level})`).join('\n') 
             : 'Chưa có con mèo nào.';
 
         let invText = '';
@@ -397,84 +339,82 @@ client.on('messageCreate', async (message) => {
             .setColor(0xD2B48C)
             .addFields(
                 { name: '💰 Tiền xu', value: `${user.coins} xu` },
-                { name: '🏡 Ô đất trồng cây', value: `${user.plotsUsed}/${user.maxPlots} ô (Gõ !muadat để mua thêm)` },
+                { name: '🏡 Ô đất trồng cây', value: `${user.plotsUsed}/${user.maxPlots} ô` },
                 { name: '📦 Vật phẩm & Nông sản', value: invText },
-                { name: '🐾 Ổ Mèo (Dùng !choan <STT> để nuôi)', value: catList }
+                { name: '🐾 Ổ Mèo', value: catList }
             );
 
         return message.channel.send({ embeds: [embed] });
     }
 
-    // Lệnh Cho Mèo Ăn (!choan / !ca)
+    // Cho ăn
     if (command === 'choan' || command === 'ca') {
-        const user = getUser(message.author.id);
+        const user = await getUser(message.author.id);
         if (user.cats.length === 0) return message.reply('😿 Bạn chưa có con mèo nào!');
-        if ((user.inventory.thucAn || 0) <= 0) return message.reply('🐟 Bạn đã hết thức ăn! Gõ `!shop` để mua.');
+        if ((user.inventory.thucAn || 0) <= 0) return message.reply('🐟 Hết thức ăn! Vào `!shop` để mua.');
 
         const index = parseInt(args[0]) - 1;
-
-        if (isNaN(index) || index < 0 || index >= user.cats.length) {
-            return message.reply(`❌ Vui lòng nhập STT mèo hợp lệ! Ví dụ: \`!choan 1\` (Gõ \`!tui\` để xem danh sách).`);
-        }
+        if (isNaN(index) || index < 0 || index >= user.cats.length) return message.reply('❌ STT mèo không hợp lệ!');
 
         user.inventory.thucAn -= 1;
         user.cats[index].level += 1;
-        return message.channel.send(`🐟 Bạn đã cho **${user.cats[index].name}** (Số ${index + 1}) ăn! Nó đã tăng lên **Level ${user.cats[index].level}**!`);
+        user.markModified('inventory');
+        user.markModified('cats');
+        await user.save();
+
+        return message.channel.send(`🐟 Bạn đã cho **${user.cats[index].name}** ăn! Lên **Level ${user.cats[index].level}**!`);
     }
 
-    // Lệnh Cửa Hàng (!shop / !s)
+    // Cửa hàng
     if (command === 'shop' || command === 's') {
         const embed = new EmbedBuilder()
             .setTitle('🏪 Tiệm Tạp Hóa Cây & Mèo')
-            .setDescription('Dùng `!mua <tên_món> [số_lượng]` để mua vật phẩm:')
+            .setDescription('Dùng `!mua <tên_món> [số_lượng]` để mua:')
             .setColor(0x98FB98)
             .addFields(
-                { name: '🌱 Hạt Giống Cây Trồng', value: '• `hatgiong_tra`: 20 xu\n• `hatgiong_caphe`: 30 xu\n• `hatgiong_lua`: 10 xu\n• `hatgiong_tre`: 50 xu\n• `hatgiong_mia`: 25 xu' },
-                { name: '🐟 Thức Ăn Cho Mèo', value: '• `thucan`: 40 xu/đĩa (Dùng `!choan <STT>` để tăng level cho mèo)' },
-                { name: '📜 Công Thức Đặc Biệt', value: '• `congthuc_tradao`: 300 xu (Mở khóa pha chế Trà Đào Cam Sả bán 500 xu/cốc)' }
+                { name: '🌱 Hạt Giống', value: '• `hatgiong_tra`: 20 xu\n• `hatgiong_caphe`: 30 xu\n• `hatgiong_lua`: 10 xu\n• `hatgiong_tre`: 50 xu\n• `hatgiong_mia`: 25 xu' },
+                { name: '🐟 Thức Ăn', value: '• `thucan`: 40 xu/đĩa' },
+                { name: '📜 Công Thức', value: '• `congthuc_tradao`: 300 xu' }
             );
 
         return message.channel.send({ embeds: [embed] });
     }
 
-    // Lệnh Mua đồ (!mua)
+    // Mua
     if (command === 'mua') {
-        const user = getUser(message.author.id);
+        const user = await getUser(message.author.id);
         const item = args[0]?.toLowerCase();
         const quantity = parseInt(args[1]) || 1;
 
-        if (!item) return message.reply('❌ Nhập tên món đồ muốn mua! Gõ `!shop` để xem.');
-        if (quantity <= 0 || isNaN(quantity)) return message.reply('❌ Số lượng mua phải lớn hơn 0!');
+        if (!item) return message.reply('❌ Nhập tên món đồ muốn mua!');
+        if (quantity <= 0 || isNaN(quantity)) return message.reply('❌ Số lượng mua không hợp lệ!');
 
-        const seedPrices = {
-            hatgiong_tra: 20,
-            hatgiong_caphe: 30,
-            hatgiong_lua: 10,
-            hatgiong_tre: 50,
-            hatgiong_mia: 25,
-            thucan: 40
-        };
+        const seedPrices = { hatgiong_tra: 20, hatgiong_caphe: 30, hatgiong_lua: 10, hatgiong_tre: 50, hatgiong_mia: 25, thucan: 40 };
 
         if (seedPrices[item]) {
             const totalPrice = seedPrices[item] * quantity;
-            if (user.coins < totalPrice) {
-                return message.reply(`❌ Bạn không đủ xu! Cần **${totalPrice} xu** để mua ${quantity} ${item} (Bạn có ${user.coins} xu).`);
-            }
+            if (user.coins < totalPrice) return message.reply(`❌ Bạn cần **${totalPrice} xu**.`);
             user.coins -= totalPrice;
             if (!user.inventory[item]) user.inventory[item] = 0;
             user.inventory[item] += quantity;
-            return message.reply(`🛒 Bạn đã mua thành công **${quantity} ${item}** với giá **${totalPrice} xu**!`);
+            user.markModified('inventory');
+            await user.save();
+            return message.reply(`🛒 Đã mua thành công **${quantity} ${item}**!`);
         } else if (item === 'congthuc_tradao') {
-            if (user.unlockedRecipes.includes('tradao')) return message.reply('📜 Bạn đã mua công thức này rồi!');
-            if (user.coins < 300) return message.reply('❌ Bạn cần 300 xu để mua công thức này!');
+            if (user.unlockedRecipes.includes('tradao')) return message.reply('📜 Bạn đã mua rồi!');
+            if (user.coins < 300) return message.reply('❌ Cần 300 xu!');
 
             user.coins -= 300;
             user.unlockedRecipes.push('tradao');
-            return message.reply('🎉 Bạn đã mở khóa thành công **Công Thức Trà Đào Cam Sả**! Dùng `!phache tradao` để pha chế.');
+            user.markModified('unlockedRecipes');
+            await user.save();
+            return message.reply('🎉 Đã mở khóa thành công **Công Thức Trà Đào Cam Sả**!');
         } else {
-            return message.reply('❌ Món đồ không có trong cửa hàng!');
+            return message.reply('❌ Món đồ không tồn tại!');
         }
     }
 });
+
+client.login(process.env.DISCORD_TOKEN);
 
 client.login(process.env.DISCORD_TOKEN);
