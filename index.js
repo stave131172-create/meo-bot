@@ -32,7 +32,7 @@ const CAT_TYPES = [
         name: 'Mèo Ta 🐾', 
         rarity: 'Thường', 
         rate: 25,
-        image: 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=500' 
+        image: 'https://i.pinimg.com/736x/3f/c2/e3/3fc2e35d16bb14fb953b62b7703acc6d.jpg' 
     },
     { 
         name: 'Mèo Trà Xanh 🍵', 
@@ -44,7 +44,7 @@ const CAT_TYPES = [
         name: 'Mèo Anh Lông Ngắn 🐱', 
         rarity: 'Hiếm', 
         rate: 12,
-        image: 'https://images.unsplash.com/photo-1573865526739-10659fec78a5?w=500' 
+        image: 'https://i.pinimg.com/736x/47/98/2b/47982b1d70bac5ce044ead6bc1e18fe2.jpg' 
     },
     { 
         name: 'Mèo Lofi Nghe Nhạc 🎧', 
@@ -56,7 +56,7 @@ const CAT_TYPES = [
         name: 'Mèo Anh Lông Dài 🦁', 
         rarity: 'Cực Hiếm', 
         rate: 5,
-        image: 'https://images.unsplash.com/photo-1533738363-b7f9aef128ce?w=500' 
+        image: 'https://i.pinimg.com/736x/0e/09/90/0e09907cf9dccf5e15816bcc01f308dd.jpg' 
     },
     { 
         name: 'Mèo Hoàng Gia ✨', 
