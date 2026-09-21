@@ -4,7 +4,10 @@ import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 
 // 1. Tạo Web Server giữ Render luôn hoạt động
-http.createServer((req, res) => res.end('Bot Meo va Tra is running!')).listen(process.env.PORT || 3000);
+const PORT = process.env.PORT || 3000;
+http.createServer((req, res) => res.end('Bot Meo va Tra is running!')).listen(PORT, () => {
+    console.log(`🌐 Web server đang lắng nghe tại port ${PORT}`);
+});
 
 dotenv.config();
 
@@ -23,7 +26,7 @@ const userSchema = new mongoose.Schema({
     userId: { type: String, required: true, unique: true },
     coins: { type: Number, default: 100 },
     cats: { type: Array, default: [] },
-    inventory: { type: Object, default: { hatgiong_tra: 2, thucAn: 2 } },
+    inventory: { type: Object, default: { hatgiong_tra: 2, thucan: 2 } }, // Chuẩn hóa thucan
     maxPlots: { type: Number, default: 5 },
     plotsUsed: { type: Number, default: 0 },
     unlockedRecipes: { type: Array, default: [] },
@@ -31,7 +34,7 @@ const userSchema = new mongoose.Schema({
     lastKiemTienPet: { type: Number, default: 0 }
 });
 
-// Định nghĩa khung dữ liệu Cấu hình Bot (Config Schema - để lưu Kênh Spawn)
+// Định nghĩa khung dữ liệu Cấu hình Bot
 const configSchema = new mongoose.Schema({
     key: { type: String, required: true, unique: true },
     value: { type: String, default: null }
@@ -47,7 +50,6 @@ async function getUser(userId) {
         user = new User({ userId });
         await user.save();
     }
-    // Đảm bảo inventory luôn là object
     if (!user.inventory) user.inventory = {};
     return user;
 }
@@ -93,9 +95,11 @@ client.once('ready', () => {
     setInterval(spawnCatTask, 5 * 60 * 1000); // 5 phút xuất hiện 1 lần
 });
 
-// Hàm Spawn mèo lang thang (Có đọc Kênh từ Database)
+// Hàm Spawn mèo lang thang
 async function spawnCatTask() {
     try {
+        if (mongoose.connection.readyState !== 1) return;
+
         const channelConfig = await Config.findOne({ key: 'spawn_channel' });
         if (!channelConfig || !channelConfig.value) return;
 
@@ -180,10 +184,10 @@ client.on('messageCreate', async (message) => {
             return message.channel.send({ embeds: [embed] });
         }
 
-        // 📍 Lệnh Cài Đặt Kênh Spawn (Đã sửa lưu Database)
+        // 📍 Lệnh Cài Đặt Kênh Spawn (Đã sửa an toàn quyền Admin)
         if (command === 'setchannel') {
-            if (!message.member.permissions.has('Administrator')) {
-                return message.reply('❌ Bạn cần quyền Administrator để dùng lệnh này!');
+            if (!message.guild || !message.member?.permissions?.has('Administrator')) {
+                return message.reply('❌ Bạn cần quyền Administrator trong Server để dùng lệnh này!');
             }
             await Config.findOneAndUpdate(
                 { key: 'spawn_channel' },
@@ -382,16 +386,20 @@ client.on('messageCreate', async (message) => {
             return message.channel.send({ embeds: [embed] });
         }
 
-        // 📍 Lệnh Cho Mèo Ăn
+        // 📍 Lệnh Cho Mèo Ăn (Đã sửa dùng 'thucan')
         if (command === 'choan' || command === 'ca') {
             const user = await getUser(message.author.id);
             if (!user.cats || user.cats.length === 0) return message.reply('😿 Bạn chưa có con mèo nào!');
-            if ((user.inventory.thucAn || 0) <= 0) return message.reply('🐟 Hết thức ăn! Vào `!shop` để mua.');
+            
+            const foodCount = user.inventory.thucan || user.inventory.thucAn || 0;
+            if (foodCount <= 0) return message.reply('🐟 Hết thức ăn! Vào `!shop` để mua.');
 
             const index = parseInt(args[0]) - 1;
             if (isNaN(index) || index < 0 || index >= user.cats.length) return message.reply('❌ STT mèo không hợp lệ!');
 
-            user.inventory.thucAn -= 1;
+            if (user.inventory.thucan) user.inventory.thucan -= 1;
+            else if (user.inventory.thucAn) user.inventory.thucAn -= 1;
+
             user.cats[index].level = (user.cats[index].level || 1) + 1;
             user.markModified('inventory');
             user.markModified('cats');
