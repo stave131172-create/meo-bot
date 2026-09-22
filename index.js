@@ -201,20 +201,25 @@ client.on('messageCreate', async (message) => {
             }
         }
 
-        // 📍 HELP
-        if (command === 'help' || command === 'h') {
-            const embed = new EmbedBuilder()
-                .setTitle('🍵 Hướng Dẫn Bot Mèo Và Trà')
-                .setColor(0x98FB98)
-                .addFields(
-                    { name: '📜 **Nhiệm Vụ & Điểm Danh**', value: '• `!quest` | `!nv`: Xem & nhận thưởng nhiệm vụ (Reset 12h/lần).\n• `!diemdanh` | `!dd`: Điểm danh 24h/lần.' },
-                    { name: '🐾 **Mèo & Kiếm Tiền**', value: '• `!cat` | `!meo`: Bắt mèo lang thang.\n• `!kiemtien` | `!kt`: Rút xu mèo tích lũy trong chuồng.\n• `!choan <STT>`: Cho mèo ăn tăng XP/Level.' },
-                    { name: '🌱 **Nông Trại**', value: '• `!trong <loại> <số_lượng>`: Trồng cây (lua, tra, mia, caphe, tre).\n• `!thuhoach` | `!th`: Thu hoạch cây đã chín.' },
-                    { name: '🏪 **Cửa Hàng & Túi Đồ**', value: '• `!shop` | `!s`: Xem cửa hàng & số tiền hiện có.\n• `!mua <món> [số_lượng]`: Mua vật phẩm.\n• `!ban <món> [số_lượng]`: Bán nông sản.\n• `!tui` | `!t`: Xem tài sản, ô đất và mèo.' }
-                );
+        /// 📍 HELP (Có thêm emoji riêng ở cuối)
+if (command === 'help' || command === 'h') {
+    const embed = new EmbedBuilder()
+        .setTitle('🍵 Hướng Dẫn Bot Mèo Và Trà')
+        .setColor(0x98FB98)
+        .addFields(
+            { name: '📜 **Nhiệm Vụ & Điểm Danh**', value: '• `!quest` | `!nv`: Xem & nhận thưởng nhiệm vụ.\n• `!diemdanh` | `!dd`: Điểm danh 24h/lần.' },
+            { name: '🐾 **Mèo & Bộ Sưu Tầm**', value: '• `!cat` | `!meo`: Bắt mèo lang thang.\n• `!index` | `!zoo`: Xem bộ sưu tập mèo chuẩn OwO.\n• `!kiemtien` | `!kt`: Rút xu mèo tích lũy.\n• `!choan <STT>`: Cho mèo ăn tăng XP/Level.' },
+            { name: '🌱 **Nông Trại & Tiệm Đồ**', value: '• `!trong <loại> <số_lượng>`: Trồng cây.\n• `!thuhoach` | `!th`: Thu hoạch nông sản.\n• `!shop` | `!s`: Cửa hàng & số dư.\n• `!tui` | `!t`: Xem hành trang.' }
+        )
+        // 👉 Cách 1: Thêm emoji vào phần Footer ở cuối bảng Embed
+        .setFooter({ text: 'Chúc bạn có những phút giây thư giãn cùng Miêu Nha! ', iconURL: message.author.displayAvatarURL() });
 
-            return message.channel.send({ embeds: [embed] });
-        }
+    // 👉 Cách 2: Nếu muốn emoji nằm ngay trong tin nhắn gửi kèm bảng Help
+    return message.channel.send({ 
+        content: `Chúc bạn chơi game vui vẻ! <:515cfc9ff17fb27363d5bbe71007fb5d:1551954032569098320>`, 
+        embeds: [embed] 
+    });
+}
 
         // 📍 NHIỆM VỤ (!quest)
         if (command === 'quest' || command === 'nv') {
