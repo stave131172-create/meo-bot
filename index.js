@@ -5,7 +5,7 @@ import mongoose from 'mongoose';
 
 dotenv.config();
 
-// 1. Web Server giữ cho Render sống
+// 1. Web Server giữ Render hoạt động
 const PORT = process.env.PORT || 3000;
 http.createServer((req, res) => res.end('Bot Meo va Tra is running!')).listen(PORT, () => {
     console.log(`🌐 Web server đang lắng nghe tại port ${PORT}`);
@@ -34,7 +34,7 @@ const configSchema = new mongoose.Schema({
 const User = mongoose.model('User', userSchema);
 const Config = mongoose.model('Config', configSchema);
 
-// DỮ LIỆU CÂY TRỒNG & NÔNG SẢN
+// DỮ LIỆU CÂY TRỒNG
 const PLANTS = {
     lua: { name: 'Lúa', seedItem: 'hatgiong_lua', cropItem: 'lua', cropName: 'Lúa', seedPrice: 10, cropPrice: 18, timeMs: 20000 },
     tra: { name: 'Cây Trà', seedItem: 'hatgiong_tra', cropItem: 'la_tra', cropName: 'Lá Trà', seedPrice: 25, cropPrice: 45, timeMs: 40000 },
@@ -43,7 +43,7 @@ const PLANTS = {
     tre: { name: 'Cây Tre', seedItem: 'hatgiong_tre', cropItem: 'than_tre', cropName: 'Thân Tre', seedPrice: 120, cropPrice: 220, timeMs: 120000 }
 };
 
-// DỮ LIỆU ĐỘ HIẾM & EMOJI
+// DỮ LIỆU ĐỘ HIẾM & CUSTOM EMOJI
 const RARITY_CONFIG = {
     'Thường': { icon: '<:common:1551966215721975878>' },
     'Hiếm': { icon: '<:uncommon:1551966317287055430>' },
@@ -53,10 +53,12 @@ const RARITY_CONFIG = {
     'Limited': { icon: '<:secret:1551966624221888592>' }
 };
 
-// DỮ LIỆU MÈO (Sử dụng 100% Custom Emoji bạn đã cung cấp)
+// DANH SÁCH MÈO VỚI CUSTOM EMOJI
 const CAT_TYPES = [
-    { name: 'Mèo Béo Phơi Nắng', rarity: 'Thường', rate: 25, emoji: '🐱', image: 'https://i.pinimg.com/736x/09/04/14/0904144cabdfd4e01784bf064d56d290.jpg', incomePerSec: 0.1 },
+    { name: 'Mèo Béo Phơi Nắng', rarity: 'Thường', rate: 25, emoji: '<:meobeo:1551973509796724786>', image: 'https://i.pinimg.com/736x/09/04/14/0904144cabdfd4e01784bf064d56d290.jpg', incomePerSec: 0.1 },
     { name: 'Mèo Mướp', rarity: 'Thường', rate: 20, emoji: '<:meomuop:1551973509796724786>', image: 'https://i.pinimg.com/736x/ce/04/8c/ce048c234c179b17841811151df5259c.jpg', incomePerSec: 0.1 },
+    { name: 'Mèo Anh Lông Dài', rarity: 'Thường', rate: 15, emoji: '<:meotuuxedo:1551973751921451079>', image: 'https://i.pinimg.com/736x/ce/04/8c/ce048c234c179b17841811151df5259c.jpg', incomePerSec: 0.1 },
+    { name: 'Mèo Anh Lông Ngắn', rarity: 'Thường', rate: 15, emoji: '<:meobeo:1551973509796724786>', image: 'https://i.pinimg.com/736x/09/04/14/0904144cabdfd4e01784bf064d56d290.jpg', incomePerSec: 0.1 },
     { name: 'Mèo Ragdoll', rarity: 'Hiếm', rate: 12, emoji: '<:meoragdoll:1551973858276409414>', image: 'https://i.pinimg.com/736x/39/d2/da/39d2dae2e2cabc21163699f6e3601916.jpg', incomePerSec: 0.25 },
     { name: 'Mèo Tuxedo', rarity: 'Hiếm', rate: 12, emoji: '<:meotuxedo:1551973751921451079>', image: 'https://i.pinimg.com/1200x/9f/84/3d/9f843d43cc4078283dae7327e8ce7314.jpg', incomePerSec: 0.25 },
     { name: 'Mèo Trà Xanh', rarity: 'Hiếm', rate: 10, emoji: '<:meotraxanh:1551974270505189426>', image: 'https://i.pinimg.com/736x/a2/06/ad/a206ad186aed59dff16bbce4bdff424b.jpg', incomePerSec: 0.25 },
@@ -65,7 +67,6 @@ const CAT_TYPES = [
     { name: 'Mèo Hoàng Gia', rarity: 'Huyền Thoại', rate: 5, emoji: '<:meohoanggia:1551973577153314966>', image: 'https://i.pinimg.com/1200x/2b/05/9e/2b059e2fbcf5c9087bf1e8f1f2a17165.jpg', incomePerSec: 2.5 }
 ];
 
-// CÔNG THỨC PHA CHẾ
 const RECIPES = {
     tradao: { name: 'Trà Đào Cam Sả 🍹', ingredients: { la_tra: 5, dao: 3, cam: 2 }, brewTimeMs: 180000, price: 600 },
     caphesua: { name: 'Cà Phê Sữa ☕', ingredients: { hat_caphe: 4, sua: 2 }, brewTimeMs: 150000, price: 400 },
@@ -76,12 +77,22 @@ function getRequiredXP(level) {
     return Math.floor(10 * Math.pow(level, 1.5));
 }
 
-// LÀM SẠCH TÊN MÈO (Xóa bỏ các emoji thừa dính trong database cũ)
+// XỬ LÝ LÀM SẠCH TÊN MÈO VÀ LẤY EMOJI CHUẨN
 function cleanCatName(rawName) {
     if (!rawName) return 'Mèo Mướp';
+    // Loại bỏ tất cả unicode emoji cũ và custom emoji tag
     let clean = rawName.replace(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|<a?:.+?:\d+>/gu, '').trim();
-    if (clean === 'Mèo Ta' || clean.includes('Mèo Ta')) return 'Mèo Mướp';
+    if (clean === 'Mèo Ta') return 'Mèo Mướp';
     return clean;
+}
+
+function getCatInfo(rawName) {
+    const clean = cleanCatName(rawName);
+    const found = CAT_TYPES.find(c => clean.toLowerCase().includes(c.name.toLowerCase()) || c.name.toLowerCase().includes(clean.toLowerCase()));
+    return {
+        cleanName: clean,
+        emoji: found ? found.emoji : '🐱'
+    };
 }
 
 function checkAndResetQuests(user) {
@@ -230,7 +241,7 @@ client.on('messageCreate', async (message) => {
                 let lineIcons = '';
                 if (catsInRarity.length > 0) {
                     lineIcons = catsInRarity.map(cat => {
-                        const isOwned = ownedCatNames.some(name => name.includes(cat.name) || cat.name.includes(name));
+                        const isOwned = ownedCatNames.some(name => name.toLowerCase().includes(cat.name.toLowerCase()) || cat.name.toLowerCase().includes(name.toLowerCase()));
                         if (isOwned) {
                             totalOwnedUnique++;
                             return cat.emoji;
@@ -253,24 +264,6 @@ client.on('messageCreate', async (message) => {
             return message.channel.send({ embeds: [embed] });
         }
 
-        // 📍 HELP
-        if (command === 'help' || command === 'h') {
-            const embed = new EmbedBuilder()
-                .setTitle('🍵 Hướng Dẫn Bot Mèo Và Trà')
-                .setColor(0x98FB98)
-                .addFields(
-                    { name: '📜 **Nhiệm Vụ & Điểm Danh**', value: '• `!quest` | `!nv`: Xem & nhận thưởng nhiệm vụ.\n• `!diemdanh` | `!dd`: Điểm danh 24h/lần.' },
-                    { name: '🐾 **Mèo & Bộ Sưu Tầm**', value: '• `!cat` | `!meo`: Bắt mèo lang thang.\n• `!index` | `!zoo`: Xem bộ sưu tập mèo.\n• `!kiemtien` | `!kt`: Rút xu mèo tích lũy.\n• `!choan <STT>`: Cho mèo ăn tăng XP/Level.' },
-                    { name: '🌱 **Nông Trại & Tiệm Đồ**', value: '• `!trong <loại> <số_lượng>`: Trồng cây.\n• `!thuhoach` | `!th`: Thu hoạch nông sản.\n• `!shop` | `!s`: Cửa hàng & số dư.\n• `!tui` | `!t`: Xem hành trang.' }
-                )
-                .setFooter({ text: 'Chúc bạn có những phút giây thư giãn cùng Miêu Nha!', iconURL: message.author.displayAvatarURL() });
-
-            return message.channel.send({ 
-                content: `Chúc bạn chơi game vui vẻ! <:515cfc9ff17fb27363d5bbe71007fb5d:1551954032569098320>`, 
-                embeds: [embed] 
-            });
-        }
-
         // 📍 TÚI ĐỒ (!tui)
         if (command === 'tui' || command === 't') {
             const user = await getUser(message.author.id);
@@ -278,10 +271,8 @@ client.on('messageCreate', async (message) => {
 
             const catList = user.cats.length > 0 
                 ? user.cats.map((c, i) => {
-                    const cleanName = cleanCatName(c.name);
-                    const catDef = CAT_TYPES.find(ct => cleanName.includes(ct.name) || ct.name.includes(cleanName));
-                    const emoji = catDef ? catDef.emoji : '🐱';
-                    return `**${i + 1}.** ${emoji} **${cleanName}** (Lv.${c.level || 1} - ${c.xp || 0}/${getRequiredXP(c.level || 1)} XP)`;
+                    const info = getCatInfo(c.name);
+                    return `**${i + 1}.** ${info.emoji} **${info.cleanName}** (Lv.${c.level || 1} - ${c.xp || 0}/${getRequiredXP(c.level || 1)} XP)`;
                 }).join('\n') 
                 : 'Chưa có con mèo nào.';
 
@@ -305,6 +296,24 @@ client.on('messageCreate', async (message) => {
                 );
 
             return message.channel.send({ embeds: [embed] });
+        }
+
+        // 📍 HELP
+        if (command === 'help' || command === 'h') {
+            const embed = new EmbedBuilder()
+                .setTitle('🍵 Hướng Dẫn Bot Mèo Và Trà')
+                .setColor(0x98FB98)
+                .addFields(
+                    { name: '📜 **Nhiệm Vụ & Điểm Danh**', value: '• `!quest` | `!nv`: Xem & nhận thưởng nhiệm vụ.\n• `!diemdanh` | `!dd`: Điểm danh 24h/lần.' },
+                    { name: '🐾 **Mèo & Bộ Sưu Tầm**', value: '• `!cat` | `!meo`: Bắt mèo lang thang.\n• `!index` | `!zoo`: Xem bộ sưu tập mèo.\n• `!kiemtien` | `!kt`: Rút xu mèo tích lũy.\n• `!choan <STT>`: Cho mèo ăn tăng XP/Level.' },
+                    { name: '🌱 **Nông Trại & Tiệm Đồ**', value: '• `!trong <loại> <số_lượng>`: Trồng cây.\n• `!thuhoach` | `!th`: Thu hoạch nông sản.\n• `!shop` | `!s`: Cửa hàng & số dư.\n• `!tui` | `!t`: Xem hành trang.' }
+                )
+                .setFooter({ text: 'Chúc bạn có những phút giây thư giãn cùng Miêu Nha!', iconURL: message.author.displayAvatarURL() });
+
+            return message.channel.send({ 
+                content: `Chúc bạn chơi game vui vẻ! <:515cfc9ff17fb27363d5bbe71007fb5d:1551954032569098320>`, 
+                embeds: [embed] 
+            });
         }
 
         // 📍 NHIỆM VỤ (!quest)
@@ -510,8 +519,8 @@ client.on('messageCreate', async (message) => {
             const maxRates = { 'Thường': 0, 'Hiếm': 0, 'Cực Hiếm': 0, 'Huyền Thoại': 0, 'Sử Thi': 0, 'Limited': 0 };
 
             user.cats.forEach(c => {
-                const cleanName = cleanCatName(c.name);
-                const catDef = CAT_TYPES.find(ct => cleanName.includes(ct.name) || ct.name.includes(cleanName)) || CAT_TYPES[0];
+                const info = getCatInfo(c.name);
+                const catDef = CAT_TYPES.find(ct => info.cleanName.toLowerCase().includes(ct.name.toLowerCase()) || ct.name.toLowerCase().includes(info.cleanName.toLowerCase())) || CAT_TYPES[0];
                 if (catDef.incomePerSec > maxRates[catDef.rarity]) {
                     maxRates[catDef.rarity] = catDef.incomePerSec;
                 }
@@ -544,7 +553,8 @@ client.on('messageCreate', async (message) => {
 
             user.inventory.thucan -= 1;
             const targetCat = user.cats[index];
-            targetCat.name = cleanCatName(targetCat.name);
+            const info = getCatInfo(targetCat.name);
+            targetCat.name = info.cleanName;
 
             targetCat.level = targetCat.level || 1;
             targetCat.xp = (targetCat.xp || 0) + 15;
