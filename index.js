@@ -11,7 +11,7 @@ http.createServer((req, res) => res.end('Bot Meo va Tra is running!')).listen(PO
     console.log(`🌐 Web server đang lắng nghe tại port ${PORT}`);
 });
 
-// 2. SCHEMAS & DATABASE (Sửa đổi 1: Default 20 coins)
+// 2. SCHEMAS & DATABASE
 const userSchema = new mongoose.Schema({
     userId: { type: String, required: true, unique: true },
     coins: { type: Number, default: 20 },
@@ -34,7 +34,7 @@ const configSchema = new mongoose.Schema({
 const User = mongoose.model('User', userSchema);
 const Config = mongoose.model('Config', configSchema);
 
-// SỬA ĐỔI 3: CÂN BẰNG GIÁ CÂY TRỒNG
+// DỮ LIỆU CÂY TRỒNG
 const PLANTS = {
     lua: { name: 'Lúa', seedItem: 'hatgiong_lua', cropItem: 'lua', cropName: 'Lúa', seedPrice: 10, cropPrice: 18, timeMs: 20000 },
     tra: { name: 'Cây Trà', seedItem: 'hatgiong_tra', cropItem: 'la_tra', cropName: 'Lá Trà', seedPrice: 30, cropPrice: 55, timeMs: 40000 },
@@ -52,7 +52,6 @@ const RARITY_CONFIG = {
     'Limited': { icon: '<:secret:1551966624221888592>' }
 };
 
-// SỬA ĐỔI 2 & 3: TÁCH RIÊNG EMOJI MÈO VÀ CÂN BẰNG LẠI TIỀN / GIÂY
 const CAT_TYPES = [
     { name: 'Mèo Béo Phơi Nắng', rarity: 'Thường', rate: 25, emoji: '<:meobeophoinang:1551973509796724786>', image: 'https://i.pinimg.com/736x/09/04/14/0904144cabdfd4e01784bf064d56d290.jpg', incomePerSec: 0.02 },
     { name: 'Mèo Mướp', rarity: 'Thường', rate: 20, emoji: '<:meomuop:1551973509796724786>', image: 'https://i.pinimg.com/736x/ce/04/8c/ce048c234c179b17841811151df5259c.jpg', incomePerSec: 0.02 },
@@ -72,14 +71,13 @@ const RECIPES = {
     nuocmia: { name: 'Nước Mía Tắc 🥤', ingredients: { cay_mia: 5, tac: 2 }, brewTimeMs: 90000, price: 250 }
 };
 
-const MAX_CAT_LEVEL = 10; // MAX LEVEL LÀ 10
+const MAX_CAT_LEVEL = 10;
 
 function getRequiredXP(level) {
     if (level >= MAX_CAT_LEVEL) return 'MAX';
     return Math.floor(15 * Math.pow(level, 1.4));
 }
 
-// HÀM CHUYỂN ĐỔI SỐ THÀNH SỐ MŨ
 function toSuperscript(num) {
     const supers = { '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹' };
     return String(num).split('').map(digit => supers[digit] || digit).join('');
@@ -153,7 +151,7 @@ let currentWildCat = null;
 
 client.once('ready', () => {
     console.log(`✅ Bot chill Node.js ${client.user.tag} đã sẵn sàng!`);
-    client.user.setActivity('Uống trà & chăm mèo 🍵');
+    client.user.setActivity('Uống trà & chăm mèo 🍵 (!help)');
     setInterval(spawnCatTask, 45 * 60 * 1000);
 });
 
@@ -203,7 +201,36 @@ client.on('messageCreate', async (message) => {
         const args = content.startsWith(PREFIX) ? content.slice(PREFIX.length).trim().split(/ +/) : [content];
         const command = args.shift().toLowerCase();
 
-        // SỬA ĐỔI 5: RESET DATA CỦA TOÀN BỘ NGƯỜI CHƠI (CHỈ DÀNH CHO ADMIN)
+        // 📌 LỆNH HELP (ĐÃ BỔ SUNG LẠI)
+        if (command === 'help' || command === 'h') {
+            const embed = new EmbedBuilder()
+                .setTitle('📜 HƯỚNG DẪN CÁCH CHƠI - MÈO & TRÀ 🍵')
+                .setDescription('Dưới đây là toàn bộ danh sách lệnh bạn có thể sử dụng:')
+                .setColor(0xFFA500)
+                .addFields(
+                    { 
+                        name: '🎒 Cá Nhân & Bắt Mèo', 
+                        value: '• `!tui` (hoặc `!t`): Xem hành trang, ví tiền, nông trại & mèo đang có.\n• `!index` (hoặc `!zoo`): Xem bộ sưu tập mèo đã thu thập được.\n• `!cat` / `!meo`: Bắt mèo lang thang khi nó xuất hiện.\n• `!diemdanh` (hoặc `!dd`): Uống trà sáng nhận xu miễn phí mỗi ngày.' 
+                    },
+                    { 
+                        name: '🌱 Nông Trại & Chăm Mèo', 
+                        value: '• `!trong <loại> [số_lượng]`: Trồng cây (lua, tra, mia, caphe, tre).\n• `!thuhoach` (hoặc `!th`): Thu hoạch cây trồng đã chín.\n• `!choan <STT>`: Cho mèo ăn tăng XP (STT lấy từ lệnh `!tui`).\n• `!kiemtien` (hoặc `!kt`): Thu gom tiền tích lũy từ đàn mèo.' 
+                    },
+                    { 
+                        name: '🏪 Cửa Hàng & Chế Đồ', 
+                        value: '• `!shop` (hoặc `!s`): Xem danh sách hạt giống và thức ăn.\n• `!mua <tên_món> [số_lượng]`: Mua hạt giống hoặc thức ăn.\n• `!ban <tên_món> [số_lượng]`: Bán nông sản/nước uống kiếm xu.\n• `!phache <tên_món>`: Pha chế đồ uống (tradao, caphesua, nuocmia).' 
+                    },
+                    { 
+                        name: '⚙️ Quản Trị Viên (Admin Only)', 
+                        value: '• `!setchannel`: Cài đặt kênh này làm nơi mèo xuất hiện.\n• `!resetdata`: Reset toàn bộ tiền và túi mèo của tất cả người chơi.' 
+                    }
+                )
+                .setFooter({ text: 'Chúc bạn chơi game vui vẻ!' });
+
+            return message.channel.send({ embeds: [embed] });
+        }
+
+        // RESET DATA (ADMIN)
         if (command === 'resetdata') {
             if (!message.member?.permissions?.has('Administrator')) {
                 return message.reply('❌ Bạn không có quyền xài lệnh này!');
@@ -220,7 +247,7 @@ client.on('messageCreate', async (message) => {
             return message.channel.send('⚠️ **ĐÃ RESET TIỀN VÀ TÚI MÈO CỦA TOÀN BỘ NGƯỜI CHƠI VỀ MẶC ĐỊNH (20 xu)!**');
         }
 
-        // 📍 BẮT MÈO
+        // BẮT MÈO
         if (command === 'cat' || command === 'meo') {
             if (currentWildCat) {
                 const catCaught = currentWildCat;
@@ -247,12 +274,11 @@ client.on('messageCreate', async (message) => {
             }
         }
 
-        // SỬA ĐỔI 4: GHI TRONG !INDEX LÀ EMOJI MÈO + SỐ CON ĐANG CÓ (SỐ MŨ)
+        // INDEX MÈO
         if (command === 'index' || command === 'zoo') {
             const user = await getUser(message.author.id);
             if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
 
-            // Đếm số lượng từng loại mèo người chơi sở hữu
             const catCounts = {};
             user.cats.forEach(c => {
                 const clean = cleanCatName(c.name);
@@ -292,14 +318,13 @@ client.on('messageCreate', async (message) => {
             return message.channel.send({ embeds: [embed] });
         }
 
-        // SỬA ĐỔI 4: GHI TRONG !TUI GỘP SỐ LƯỢNG MÈO TRÙNG
+        // TÚI ĐỒ
         if (command === 'tui' || command === 't') {
             const user = await getUser(message.author.id);
             if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
 
             let catList = 'Chưa có con mèo nào.';
             if (user.cats.length > 0) {
-                // Nhóm các con mèo trùng Tên + Level
                 const groupedCats = {};
                 user.cats.forEach(c => {
                     const info = getCatInfo(c.name);
@@ -350,7 +375,7 @@ client.on('messageCreate', async (message) => {
             return message.channel.send({ embeds: [embed] });
         }
 
-        // 📍 SHOP (Cập nhật giá mới)
+        // SHOP
         if (command === 'shop' || command === 's') {
             const user = await getUser(message.author.id);
             const userCoins = user ? user.coins : 0;
@@ -367,7 +392,7 @@ client.on('messageCreate', async (message) => {
             return message.channel.send({ embeds: [embed] });
         }
 
-        // 📍 MUA ĐỒ
+        // MUA ĐỒ
         if (command === 'mua') {
             const user = await getUser(message.author.id);
             if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
@@ -394,7 +419,7 @@ client.on('messageCreate', async (message) => {
             return message.reply(`🛒 Bạn đã mua thành công **${quantity}x ${item}** với giá **${total} xu**!`);
         }
 
-        // SỬA ĐỔI 3: CÂN BẰNG TÍNH TIỀN THEO LEVEL MÈO (MAX LVL 10)
+        // RÚT TIỀN TỪ MÈO
         if (command === 'kiemtien' || command === 'kt') {
             const user = await getUser(message.author.id);
             if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
@@ -413,7 +438,6 @@ client.on('messageCreate', async (message) => {
                 const catDef = CAT_TYPES.find(ct => info.cleanName.toLowerCase().includes(ct.name.toLowerCase()) || ct.name.toLowerCase().includes(info.cleanName.toLowerCase())) || CAT_TYPES[0];
                 const catLvl = Math.min(MAX_CAT_LEVEL, c.level || 1);
                 
-                // Thu nhập cơ bản + (10% bonus cho mỗi Level tăng thêm)
                 const baseIncome = catDef.incomePerSec;
                 const levelBonus = 1 + ((catLvl - 1) * 0.1);
                 totalIncomePerSec += (baseIncome * levelBonus);
@@ -430,7 +454,7 @@ client.on('messageCreate', async (message) => {
             return message.reply(`🐾 Đàn mèo đã chăm chỉ tích lũy! Bạn rút được **${totalEarned} xu** trong chuồng!`);
         }
 
-        // SỬA ĐỔI 3: CHO MÈO ĂN TĂNG XP (GIỚI HẠN LEVEL MAX 10)
+        // CHO MÈO ĂN
         if (command === 'choan') {
             const user = await getUser(message.author.id);
             if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
@@ -482,7 +506,7 @@ client.on('messageCreate', async (message) => {
             }
         }
 
-        // 📍 TRỒNG CÂY
+        // TRỒNG CÂY
         if (command === 'trong' || command === 'tr') {
             const user = await getUser(message.author.id);
             if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
@@ -515,7 +539,7 @@ client.on('messageCreate', async (message) => {
             return message.reply(`🌱 Đã trồng **${count}x ${plant.name}**! Gõ \`!thuhoach\` khi cây chín.`);
         }
 
-        // 📍 THU HOẠCH
+        // THU HOẠCH
         if (command === 'thuhoach' || command === 'th') {
             const user = await getUser(message.author.id);
             if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
@@ -548,7 +572,7 @@ client.on('messageCreate', async (message) => {
             return message.reply(resultMsg);
         }
 
-        // 📍 BÁN NÔNG SẢN
+        // BÁN NÔNG SẢN
         if (command === 'ban' || command === 'b') {
             const user = await getUser(message.author.id);
             if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
@@ -578,7 +602,7 @@ client.on('messageCreate', async (message) => {
             return message.reply(`💰 Bạn đã bán **${quantity}x ${item}** thu về **${earnings} xu**!`);
         }
 
-        // 📍 PHA CHẾ
+        // PHA CHẾ
         if (command === 'phache' || command === 'pha') {
             const user = await getUser(message.author.id);
             if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
@@ -607,7 +631,7 @@ client.on('messageCreate', async (message) => {
             return message.reply(`🍵 Đã pha thành công **${recipe.name}**! Bạn có thể dùng \`!ban ${drinkKey}\` để bán với giá **${recipe.price} xu**.`);
         }
 
-        // 📍 ĐIỂM DANH
+        // ĐIỂM DANH
         if (command === 'diemdanh' || command === 'dd') {
             const user = await getUser(message.author.id);
             if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
@@ -630,7 +654,7 @@ client.on('messageCreate', async (message) => {
             return message.channel.send(`🍵 ${message.author} thưởng trà sáng và nhận **${reward} xu**!`);
         }
 
-        // 📍 CÀI KÊNH SPAWN MÈO
+        // KÊNH SPAWN MÈO
         if (command === 'setchannel') {
             if (!message.guild || !message.member?.permissions?.has('Administrator')) {
                 return message.reply('❌ Cần quyền Administrator!');
