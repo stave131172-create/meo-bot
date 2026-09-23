@@ -53,10 +53,10 @@ const RARITY_CONFIG = {
     'Limited': { icon: '<:secret:1551966624221888592>' }
 };
 
-// DỮ LIỆU MÈO (Mèo độ hiếm Thường dùng Emoji thường 🐱, 😸)
+// DỮ LIỆU MÈO (Đã đổi Mèo Ta -> Mèo Mướp và cập nhật Custom Emoji cho tất cả các con mèo)
 const CAT_TYPES = [
     { name: 'Mèo Béo Phơi Nắng', rarity: 'Thường', rate: 25, emoji: '🐱', image: 'https://i.pinimg.com/736x/09/04/14/0904144cabdfd4e01784bf064d56d290.jpg', incomePerSec: 0.1 },
-    { name: 'Mèo Mướp', rarity: 'Thường', rate: 20, emoji: '😸', image: 'https://i.pinimg.com/736x/ce/04/8c/ce048c234c179b17841811151df5259c.jpg', incomePerSec: 0.1 },
+    { name: 'Mèo Mướp', rarity: 'Thường', rate: 20, emoji: '<:meomuop:1551973509796724786>', image: 'https://i.pinimg.com/736x/ce/04/8c/ce048c234c179b17841811151df5259c.jpg', incomePerSec: 0.1 },
     { name: 'Mèo Ragdoll', rarity: 'Hiếm', rate: 12, emoji: '<:meoragdoll:1551973858276409414>', image: 'https://i.pinimg.com/736x/39/d2/da/39d2dae2e2cabc21163699f6e3601916.jpg', incomePerSec: 0.25 },
     { name: 'Mèo Tuxedo', rarity: 'Hiếm', rate: 12, emoji: '<:meotuxedo:1551973751921451079>', image: 'https://i.pinimg.com/1200x/9f/84/3d/9f843d43cc4078283dae7327e8ce7314.jpg', incomePerSec: 0.25 },
     { name: 'Mèo Trà Xanh', rarity: 'Hiếm', rate: 10, emoji: '<:meotraxanh:1551974270505189426>', image: 'https://i.pinimg.com/736x/a2/06/ad/a206ad186aed59dff16bbce4bdff424b.jpg', incomePerSec: 0.25 },
@@ -193,7 +193,7 @@ client.on('messageCreate', async (message) => {
 
                 const embed = new EmbedBuilder()
                     .setTitle('🎉 Bạn đã bắt thành công!')
-                    .setDescription(`${message.author} đã bắt thành công **${catCaught.name}**!`)
+                    .setDescription(`${message.author} đã bắt thành công **${catCaught.name}** ${catCaught.emoji}!`)
                     .setThumbnail(catCaught.image)
                     .setColor(0xFFB6C1);
 
@@ -222,7 +222,10 @@ client.on('messageCreate', async (message) => {
                 let lineIcons = '';
                 if (catsInRarity.length > 0) {
                     lineIcons = catsInRarity.map(cat => {
-                        const isOwned = ownedCatNames.some(name => name.includes(cat.name) || cat.name.includes(name));
+                        const isOwned = ownedCatNames.some(name => {
+                            if (name === 'Mèo Ta' && cat.name === 'Mèo Mướp') return true;
+                            return name.includes(cat.name) || cat.name.includes(name);
+                        });
                         if (isOwned) {
                             totalOwnedUnique++;
                             return cat.emoji;
@@ -245,7 +248,7 @@ client.on('messageCreate', async (message) => {
             return message.channel.send({ embeds: [embed] });
         }
 
-        // 📍 HELP (Đã sửa bỏ "chuẩn OwO")
+        // 📍 HELP
         if (command === 'help' || command === 'h') {
             const embed = new EmbedBuilder()
                 .setTitle('🍵 Hướng Dẫn Bot Mèo Và Trà')
@@ -263,16 +266,18 @@ client.on('messageCreate', async (message) => {
             });
         }
 
-        // 📍 TÚI ĐỒ (!tui - Đã thêm Emoji vào danh sách Mèo)
+        // 📍 TÚI ĐỒ (!tui)
         if (command === 'tui' || command === 't') {
             const user = await getUser(message.author.id);
             if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
 
             const catList = user.cats.length > 0 
                 ? user.cats.map((c, i) => {
-                    const catDef = CAT_TYPES.find(ct => c.name.includes(ct.name) || ct.name.includes(c.name));
+                    // Tự động chuyển đổi tên Mèo Ta -> Mèo Mướp nếu cần
+                    let displayName = c.name === 'Mèo Ta' ? 'Mèo Mướp' : c.name;
+                    const catDef = CAT_TYPES.find(ct => displayName.includes(ct.name) || ct.name.includes(displayName));
                     const emoji = catDef ? catDef.emoji : '🐱';
-                    return `**${i + 1}.** ${emoji} ${c.name} (Lv.${c.level || 1} - ${c.xp || 0}/${getRequiredXP(c.level || 1)} XP)`;
+                    return `**${i + 1}.** ${emoji} ${displayName} (Lv.${c.level || 1} - ${c.xp || 0}/${getRequiredXP(c.level || 1)} XP)`;
                 }).join('\n') 
                 : 'Chưa có con mèo nào.';
 
@@ -501,7 +506,8 @@ client.on('messageCreate', async (message) => {
             const maxRates = { 'Thường': 0, 'Hiếm': 0, 'Cực Hiếm': 0, 'Huyền Thoại': 0, 'Sử Thi': 0, 'Limited': 0 };
 
             user.cats.forEach(c => {
-                const catDef = CAT_TYPES.find(ct => c.name.includes(ct.name) || ct.name.includes(c.name)) || CAT_TYPES[0];
+                let displayName = c.name === 'Mèo Ta' ? 'Mèo Mướp' : c.name;
+                const catDef = CAT_TYPES.find(ct => displayName.includes(ct.name) || ct.name.includes(displayName)) || CAT_TYPES[0];
                 if (catDef.incomePerSec > maxRates[catDef.rarity]) {
                     maxRates[catDef.rarity] = catDef.incomePerSec;
                 }
@@ -534,6 +540,8 @@ client.on('messageCreate', async (message) => {
 
             user.inventory.thucan -= 1;
             const targetCat = user.cats[index];
+            if (targetCat.name === 'Mèo Ta') targetCat.name = 'Mèo Mướp'; // Cập nhật tên nếu là dữ liệu cũ
+
             targetCat.level = targetCat.level || 1;
             targetCat.xp = (targetCat.xp || 0) + 15;
 
