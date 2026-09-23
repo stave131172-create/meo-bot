@@ -15,7 +15,7 @@ http.createServer((req, res) => res.end('Bot Meo va Tra is running!')).listen(PO
 const userSchema = new mongoose.Schema({
     userId: { type: String, required: true, unique: true },
     coins: { type: Number, default: 50 },
-    cats: { type: Array, default: [] }, // [{ name, rarity, level, xp }]
+    cats: { type: Array, default: [] },
     inventory: { type: Object, default: { hatgiong_lua: 2, thucan: 2 } },
     plots: { type: Array, default: [] },
     maxPlots: { type: Number, default: 5 },
@@ -53,7 +53,7 @@ const RARITY_CONFIG = {
     'Limited': { icon: '<:secret:1551966624221888592>' }
 };
 
-// DỮ LIỆU MÈO (Đã đổi Mèo Ta -> Mèo Mướp và cập nhật Custom Emoji cho tất cả các con mèo)
+// DỮ LIỆU MÈO (Sử dụng 100% Custom Emoji bạn đã cung cấp)
 const CAT_TYPES = [
     { name: 'Mèo Béo Phơi Nắng', rarity: 'Thường', rate: 25, emoji: '🐱', image: 'https://i.pinimg.com/736x/09/04/14/0904144cabdfd4e01784bf064d56d290.jpg', incomePerSec: 0.1 },
     { name: 'Mèo Mướp', rarity: 'Thường', rate: 20, emoji: '<:meomuop:1551973509796724786>', image: 'https://i.pinimg.com/736x/ce/04/8c/ce048c234c179b17841811151df5259c.jpg', incomePerSec: 0.1 },
@@ -74,6 +74,14 @@ const RECIPES = {
 
 function getRequiredXP(level) {
     return Math.floor(10 * Math.pow(level, 1.5));
+}
+
+// LÀM SẠCH TÊN MÈO (Xóa bỏ các emoji thừa dính trong database cũ)
+function cleanCatName(rawName) {
+    if (!rawName) return 'Mèo Mướp';
+    let clean = rawName.replace(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|<a?:.+?:\d+>/gu, '').trim();
+    if (clean === 'Mèo Ta' || clean.includes('Mèo Ta')) return 'Mèo Mướp';
+    return clean;
 }
 
 function checkAndResetQuests(user) {
@@ -210,7 +218,7 @@ client.on('messageCreate', async (message) => {
             const user = await getUser(message.author.id);
             if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
 
-            const ownedCatNames = user.cats.map(c => c.name);
+            const ownedCatNames = user.cats.map(c => cleanCatName(c.name));
 
             let indexDescription = '';
             let totalCatsInGame = CAT_TYPES.length;
@@ -222,10 +230,7 @@ client.on('messageCreate', async (message) => {
                 let lineIcons = '';
                 if (catsInRarity.length > 0) {
                     lineIcons = catsInRarity.map(cat => {
-                        const isOwned = ownedCatNames.some(name => {
-                            if (name === 'Mèo Ta' && cat.name === 'Mèo Mướp') return true;
-                            return name.includes(cat.name) || cat.name.includes(name);
-                        });
+                        const isOwned = ownedCatNames.some(name => name.includes(cat.name) || cat.name.includes(name));
                         if (isOwned) {
                             totalOwnedUnique++;
                             return cat.emoji;
@@ -273,11 +278,10 @@ client.on('messageCreate', async (message) => {
 
             const catList = user.cats.length > 0 
                 ? user.cats.map((c, i) => {
-                    // Tự động chuyển đổi tên Mèo Ta -> Mèo Mướp nếu cần
-                    let displayName = c.name === 'Mèo Ta' ? 'Mèo Mướp' : c.name;
-                    const catDef = CAT_TYPES.find(ct => displayName.includes(ct.name) || ct.name.includes(displayName));
+                    const cleanName = cleanCatName(c.name);
+                    const catDef = CAT_TYPES.find(ct => cleanName.includes(ct.name) || ct.name.includes(cleanName));
                     const emoji = catDef ? catDef.emoji : '🐱';
-                    return `**${i + 1}.** ${emoji} ${displayName} (Lv.${c.level || 1} - ${c.xp || 0}/${getRequiredXP(c.level || 1)} XP)`;
+                    return `**${i + 1}.** ${emoji} **${cleanName}** (Lv.${c.level || 1} - ${c.xp || 0}/${getRequiredXP(c.level || 1)} XP)`;
                 }).join('\n') 
                 : 'Chưa có con mèo nào.';
 
@@ -506,8 +510,8 @@ client.on('messageCreate', async (message) => {
             const maxRates = { 'Thường': 0, 'Hiếm': 0, 'Cực Hiếm': 0, 'Huyền Thoại': 0, 'Sử Thi': 0, 'Limited': 0 };
 
             user.cats.forEach(c => {
-                let displayName = c.name === 'Mèo Ta' ? 'Mèo Mướp' : c.name;
-                const catDef = CAT_TYPES.find(ct => displayName.includes(ct.name) || ct.name.includes(displayName)) || CAT_TYPES[0];
+                const cleanName = cleanCatName(c.name);
+                const catDef = CAT_TYPES.find(ct => cleanName.includes(ct.name) || ct.name.includes(cleanName)) || CAT_TYPES[0];
                 if (catDef.incomePerSec > maxRates[catDef.rarity]) {
                     maxRates[catDef.rarity] = catDef.incomePerSec;
                 }
@@ -540,7 +544,7 @@ client.on('messageCreate', async (message) => {
 
             user.inventory.thucan -= 1;
             const targetCat = user.cats[index];
-            if (targetCat.name === 'Mèo Ta') targetCat.name = 'Mèo Mướp'; // Cập nhật tên nếu là dữ liệu cũ
+            targetCat.name = cleanCatName(targetCat.name);
 
             targetCat.level = targetCat.level || 1;
             targetCat.xp = (targetCat.xp || 0) + 15;
