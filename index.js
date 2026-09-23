@@ -53,10 +53,10 @@ const RARITY_CONFIG = {
     'Limited': { icon: '<:secret:1551966624221888592>' }
 };
 
-// DỮ LIỆU MÈO (Đã đổi Mèo Ta thành Mèo Mướp + Thêm Emoji Mèo)
+// DỮ LIỆU MÈO (Mèo độ hiếm Thường dùng Emoji thường 🐱, 😸)
 const CAT_TYPES = [
     { name: 'Mèo Béo Phơi Nắng', rarity: 'Thường', rate: 25, emoji: '🐱', image: 'https://i.pinimg.com/736x/09/04/14/0904144cabdfd4e01784bf064d56d290.jpg', incomePerSec: 0.1 },
-    { name: 'Mèo Mướp', rarity: 'Thường', rate: 20, emoji: '<:meomuop:1551973509796724786>', image: 'https://i.pinimg.com/736x/ce/04/8c/ce048c234c179b17841811151df5259c.jpg', incomePerSec: 0.1 },
+    { name: 'Mèo Mướp', rarity: 'Thường', rate: 20, emoji: '😸', image: 'https://i.pinimg.com/736x/ce/04/8c/ce048c234c179b17841811151df5259c.jpg', incomePerSec: 0.1 },
     { name: 'Mèo Ragdoll', rarity: 'Hiếm', rate: 12, emoji: '<:meoragdoll:1551973858276409414>', image: 'https://i.pinimg.com/736x/39/d2/da/39d2dae2e2cabc21163699f6e3601916.jpg', incomePerSec: 0.25 },
     { name: 'Mèo Tuxedo', rarity: 'Hiếm', rate: 12, emoji: '<:meotuxedo:1551973751921451079>', image: 'https://i.pinimg.com/1200x/9f/84/3d/9f843d43cc4078283dae7327e8ce7314.jpg', incomePerSec: 0.25 },
     { name: 'Mèo Trà Xanh', rarity: 'Hiếm', rate: 10, emoji: '<:meotraxanh:1551974270505189426>', image: 'https://i.pinimg.com/736x/a2/06/ad/a206ad186aed59dff16bbce4bdff424b.jpg', incomePerSec: 0.25 },
@@ -205,19 +205,17 @@ client.on('messageCreate', async (message) => {
             }
         }
 
-        // 📍 BỘ SƯU TẬP MÈO STYLING OWO (!index / !zoo)
+        // 📍 BỘ SƯU TẬP MÈO (!index / !zoo)
         if (command === 'index' || command === 'zoo') {
             const user = await getUser(message.author.id);
             if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
 
-            // Lấy danh sách tên mèo mà user đã sở hữu
             const ownedCatNames = user.cats.map(c => c.name);
 
             let indexDescription = '';
             let totalCatsInGame = CAT_TYPES.length;
             let totalOwnedUnique = 0;
 
-            // Lặp qua 6 độ hiếm chuẩn
             for (const [rarityName, rarityInfo] of Object.entries(RARITY_CONFIG)) {
                 const catsInRarity = CAT_TYPES.filter(c => c.rarity === rarityName);
                 
@@ -247,14 +245,14 @@ client.on('messageCreate', async (message) => {
             return message.channel.send({ embeds: [embed] });
         }
 
-        // 📍 HELP
+        // 📍 HELP (Đã sửa bỏ "chuẩn OwO")
         if (command === 'help' || command === 'h') {
             const embed = new EmbedBuilder()
                 .setTitle('🍵 Hướng Dẫn Bot Mèo Và Trà')
                 .setColor(0x98FB98)
                 .addFields(
                     { name: '📜 **Nhiệm Vụ & Điểm Danh**', value: '• `!quest` | `!nv`: Xem & nhận thưởng nhiệm vụ.\n• `!diemdanh` | `!dd`: Điểm danh 24h/lần.' },
-                    { name: '🐾 **Mèo & Bộ Sưu Tầm**', value: '• `!cat` | `!meo`: Bắt mèo lang thang.\n• `!index` | `!zoo`: Xem bộ sưu tập mèo chuẩn OwO.\n• `!kiemtien` | `!kt`: Rút xu mèo tích lũy.\n• `!choan <STT>`: Cho mèo ăn tăng XP/Level.' },
+                    { name: '🐾 **Mèo & Bộ Sưu Tầm**', value: '• `!cat` | `!meo`: Bắt mèo lang thang.\n• `!index` | `!zoo`: Xem bộ sưu tập mèo.\n• `!kiemtien` | `!kt`: Rút xu mèo tích lũy.\n• `!choan <STT>`: Cho mèo ăn tăng XP/Level.' },
                     { name: '🌱 **Nông Trại & Tiệm Đồ**', value: '• `!trong <loại> <số_lượng>`: Trồng cây.\n• `!thuhoach` | `!th`: Thu hoạch nông sản.\n• `!shop` | `!s`: Cửa hàng & số dư.\n• `!tui` | `!t`: Xem hành trang.' }
                 )
                 .setFooter({ text: 'Chúc bạn có những phút giây thư giãn cùng Miêu Nha!', iconURL: message.author.displayAvatarURL() });
@@ -263,6 +261,41 @@ client.on('messageCreate', async (message) => {
                 content: `Chúc bạn chơi game vui vẻ! <:515cfc9ff17fb27363d5bbe71007fb5d:1551954032569098320>`, 
                 embeds: [embed] 
             });
+        }
+
+        // 📍 TÚI ĐỒ (!tui - Đã thêm Emoji vào danh sách Mèo)
+        if (command === 'tui' || command === 't') {
+            const user = await getUser(message.author.id);
+            if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
+
+            const catList = user.cats.length > 0 
+                ? user.cats.map((c, i) => {
+                    const catDef = CAT_TYPES.find(ct => c.name.includes(ct.name) || ct.name.includes(c.name));
+                    const emoji = catDef ? catDef.emoji : '🐱';
+                    return `**${i + 1}.** ${emoji} ${c.name} (Lv.${c.level || 1} - ${c.xp || 0}/${getRequiredXP(c.level || 1)} XP)`;
+                }).join('\n') 
+                : 'Chưa có con mèo nào.';
+
+            let invText = '';
+            for (const [item, count] of Object.entries(user.inventory)) {
+                if (count > 0) invText += `• ${item}: **${count}**\n`;
+            }
+            if (!invText) invText = 'Túi đồ trống.';
+
+            const readyPlots = user.plots.filter(p => Date.now() >= p.harvestAt).length;
+            const growingPlots = user.plots.length - readyPlots;
+
+            const embed = new EmbedBuilder()
+                .setTitle(`🎒 Hành Trang Của ${message.author.username}`)
+                .setColor(0xD2B48C)
+                .addFields(
+                    { name: '💰 Ví tiền', value: `${user.coins} xu` },
+                    { name: '🌱 Đất trồng', value: `Tổng: **${user.plots.length}/${user.maxPlots}** ô (Chín: ${readyPlots}, Đang lớn: ${growingPlots})` },
+                    { name: '📦 Vật phẩm', value: invText },
+                    { name: '🐾 Ổ Mèo', value: catList }
+                );
+
+            return message.channel.send({ embeds: [embed] });
         }
 
         // 📍 NHIỆM VỤ (!quest)
@@ -311,37 +344,6 @@ client.on('messageCreate', async (message) => {
             await user.save();
 
             return message.reply(`🎉 Bạn đã nhận thành công **${totalReward} xu** thưởng nhiệm vụ!`);
-        }
-
-        // 📍 TÚI ĐỒ (!tui)
-        if (command === 'tui' || command === 't') {
-            const user = await getUser(message.author.id);
-            if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
-
-            const catList = user.cats.length > 0 
-                ? user.cats.map((c, i) => `**${i + 1}.** ${c.name} (Lv.${c.level || 1} - ${c.xp || 0}/${getRequiredXP(c.level || 1)} XP)`).join('\n') 
-                : 'Chưa có con mèo nào.';
-
-            let invText = '';
-            for (const [item, count] of Object.entries(user.inventory)) {
-                if (count > 0) invText += `• ${item}: **${count}**\n`;
-            }
-            if (!invText) invText = 'Túi đồ trống.';
-
-            const readyPlots = user.plots.filter(p => Date.now() >= p.harvestAt).length;
-            const growingPlots = user.plots.length - readyPlots;
-
-            const embed = new EmbedBuilder()
-                .setTitle(`🎒 Hành Trang Của ${message.author.username}`)
-                .setColor(0xD2B48C)
-                .addFields(
-                    { name: '💰 Ví tiền', value: `${user.coins} xu` },
-                    { name: '🌱 Đất trồng', value: `Tổng: **${user.plots.length}/${user.maxPlots}** ô (Chín: ${readyPlots}, Đang lớn: ${growingPlots})` },
-                    { name: '📦 Vật phẩm', value: invText },
-                    { name: '🐾 Ổ Mèo', value: catList }
-                );
-
-            return message.channel.send({ embeds: [embed] });
         }
 
         // 📍 CỬA HÀNG (!shop)
