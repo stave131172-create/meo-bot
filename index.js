@@ -5,6 +5,9 @@ import mongoose from 'mongoose';
 
 dotenv.config();
 
+// EMOJI MEOCOIN CẤU HÌNH DÙNG CHUNG
+const COIN_EMOJI = '<:MeoCoin:1552668338411409438>';
+
 // 1. Web Server giữ Render sống
 const PORT = process.env.PORT || 3000;
 http.createServer((req, res) => res.end('Bot Meo va Tra is running!')).listen(PORT, () => {
@@ -28,7 +31,7 @@ const userSchema = new mongoose.Schema({
 
 // Schema lưu Config riêng cho từng Guild (Server)
 const configSchema = new mongoose.Schema({
-    key: { type: String, required: true, unique: true }, // Dạng 'prefix_GUILDID' hoặc 'spawn_channel'
+    key: { type: String, required: true, unique: true },
     value: { type: String, default: null }
 });
 
@@ -75,7 +78,6 @@ const RECIPES = {
 const MAX_CAT_LEVEL = 10;
 const DEFAULT_PREFIX = '!';
 
-// SỬA ĐỔI 1: Quản lý Prefix riêng theo Server
 async function getPrefix(guildId) {
     if (!guildId || mongoose.connection.readyState !== 1) return DEFAULT_PREFIX;
     try {
@@ -112,15 +114,23 @@ function getCatInfo(rawName) {
     };
 }
 
+// SỬA ĐỔI 1: TÍNH NĂNG NHIỆM VỤ (QUESTS RESET MỖI 12 GIỜ)
 function checkAndResetQuests(user) {
     const now = Date.now();
     const TWELVE_HOURS = 12 * 60 * 60 * 1000;
+    
     if (!user.questResetAt || now - user.questResetAt >= TWELVE_HOURS) {
         user.questResetAt = now;
+        
+        // Sinh ngẫu nhiên số lượng nhiệm vụ cần thực hiện
+        const plantTarget = Math.floor(Math.random() * 6) + 5; // 5 - 10 cây
+        const catchTarget = Math.floor(Math.random() * 2) + 1; // 1 - 2 mèo
+        const brewTarget = Math.floor(Math.random() * 3) + 1;  // 1 - 3 ly nước
+
         user.quests = [
-            { id: 'plant', desc: 'Trồng 5 cây bất kỳ', target: 5, progress: 0, reward: 80, claimed: false },
-            { id: 'catch', desc: 'Bắt 1 con mèo lang thang', target: 1, progress: 0, reward: 120, claimed: false },
-            { id: 'brew', desc: 'Pha 2 ly nước uống', target: 2, progress: 0, reward: 150, claimed: false }
+            { id: 'plant', desc: `Trồng ${plantTarget} cây bất kỳ`, target: plantTarget, progress: 0, reward: plantTarget * 20, claimed: false },
+            { id: 'catch', desc: `Bắt ${catchTarget} con mèo lang thang`, target: catchTarget, progress: 0, reward: catchTarget * 150, claimed: false },
+            { id: 'brew', desc: `Pha ${brewTarget} ly nước uống`, target: brewTarget, progress: 0, reward: brewTarget * 100, claimed: false }
         ];
         user.markModified('quests');
     }
@@ -216,7 +226,7 @@ client.on('messageCreate', async (message) => {
         const args = content.startsWith(currentPrefix) ? content.slice(currentPrefix.length).trim().split(/ +/) : [content];
         const command = args.shift().toLowerCase();
 
-        // SỬA ĐỔI 1: Lệnh đổi Prefix CHỈ áp dụng cho Server hiện tại
+        // Lệnh đổi Prefix riêng cho từng Guild
         if (command === 'setprefix') {
             if (!message.guild) {
                 return message.reply('❌ Bạn chỉ có thể đổi prefix bên trong Server!');
@@ -232,7 +242,7 @@ client.on('messageCreate', async (message) => {
             return message.channel.send(`⚙️ **Đã đổi Prefix thành công cho Server này!** Prefix mới: \`${newPrefix}\``);
         }
 
-        // SỬA ĐỔI 2: Lệnh bí mật Reset All Data (!resetdata 200412)
+        // Lệnh bí mật Reset All Data
         if (command === 'resetdata') {
             const password = args[0];
             if (password !== '200412') {
@@ -251,7 +261,7 @@ client.on('messageCreate', async (message) => {
             return message.channel.send('⚠️ **ĐÃ RESET TOÀN BỘ DỮ LIỆU CỦA TẤT CẢ NGƯỜI CHƠI TRÊN MỌI SERVER VỀ MẶC ĐỊNH!**');
         }
 
-        // 📌 LỆNH HELP (SỬA ĐỔI 2: Bỏ resetdata khỏi Help)
+        // 📌 LỆNH HELP
         if (command === 'help' || command === 'h') {
             const p = currentPrefix;
             const embed = new EmbedBuilder()
@@ -261,7 +271,7 @@ client.on('messageCreate', async (message) => {
                 .addFields(
                     { 
                         name: '🎒 Cá Nhân & Bắt Mèo', 
-                        value: `• \`${p}tui\` (hoặc \`${p}t\`): Xem hành trang, ví tiền, nông trại & mèo đang có.\n• \`${p}index\` (hoặc \`${p}zoo\`): Xem bộ sưu tập mèo đã thu thập được.\n• \`${p}cat\` / \`${p}meo\`: Bắt mèo lang thang khi nó xuất hiện.\n• \`${p}diemdanh\` (hoặc \`${p}dd\`): Uống trà sáng nhận xu miễn phí mỗi ngày.` 
+                        value: `• \`${p}tui\` (hoặc \`${p}t\`): Xem hành trang, ví tiền, nông trại & mèo đang có.\n• \`${p}quest\` (hoặc \`${p}q\`): Xem & nhận thưởng nhiệm vụ mỗi 12h.\n• \`${p}index\` (hoặc \`${p}zoo\`): Xem bộ sưu tập mèo đã thu thập được.\n• \`${p}cat\` / \`${p}meo\`: Bắt mèo lang thang khi nó xuất hiện.\n• \`${p}diemdanh\` (hoặc \`${p}dd\`): Uống trà sáng nhận ${COIN_EMOJI} xu miễn phí mỗi ngày.` 
                     },
                     { 
                         name: '🌱 Nông Trại & Chăm Mèo', 
@@ -269,7 +279,7 @@ client.on('messageCreate', async (message) => {
                     },
                     { 
                         name: '🏪 Cửa Hàng & Chế Đồ', 
-                        value: `• \`${p}shop\` (hoặc \`${p}s\`): Xem danh sách hạt giống và thức ăn.\n• \`${p}mua <tên_món> [số_lượng]\`: Mua hạt giống hoặc thức ăn.\n• \`${p}ban <tên_món> [số_lượng]\`: Bán nông sản/nước uống kiếm xu.\n• \`${p}phache <tên_món>\`: Pha chế đồ uống (tradao, caphesua, nuocmia).` 
+                        value: `• \`${p}shop\` (hoặc \`${p}s\`): Xem danh sách hạt giống và thức ăn.\n• \`${p}mua <tên_món> [số_lượng]\`: Mua hạt giống hoặc thức ăn.\n• \`${p}ban <tên_món> [số_lượng]\`: Bán nông sản/nước uống kiếm ${COIN_EMOJI} xu.\n• \`${p}phache <tên_món>\`: Pha chế đồ uống (tradao, caphesua, nuocmia).` 
                     },
                     { 
                         name: '⚙️ Quản Trị Viên (Admin Only)', 
@@ -281,7 +291,81 @@ client.on('messageCreate', async (message) => {
             return message.channel.send({ embeds: [embed] });
         }
 
-        // SỬA ĐỔI 3: LỆNH XEM VƯỜN ĐẤT TRỒNG (!vuon hoặc !v)
+        // SỬA ĐỔI 1: LỆNH NHIỆM VỤ (!quest / !q / !nhiemvu)
+        if (command === 'quest' || command === 'q' || command === 'nhiemvu') {
+            const user = await getUser(message.author.id);
+            if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
+
+            const subCmd = args[0]?.toLowerCase();
+
+            // Nhận thưởng nhiệm vụ: !quest nhan <STT / all>
+            if (subCmd === 'nhan' || subCmd === 'claim') {
+                const target = args[1]?.toLowerCase();
+                let totalReward = 0;
+                let claimedCount = 0;
+
+                if (target === 'all') {
+                    user.quests.forEach(q => {
+                        if (q.progress >= q.target && !q.claimed) {
+                            q.claimed = true;
+                            totalReward += q.reward;
+                            claimedCount++;
+                        }
+                    });
+                } else {
+                    const idx = parseInt(target) - 1;
+                    if (isNaN(idx) || idx < 0 || idx >= user.quests.length) {
+                        return message.reply(`❌ Cú pháp nhận thưởng: \`${currentPrefix}quest nhan <1/2/3>\` hoặc \`${currentPrefix}quest nhan all\``);
+                    }
+
+                    const q = user.quests[idx];
+                    if (q.claimed) {
+                        return message.reply('❌ Bạn đã nhận thưởng nhiệm vụ này rồi!');
+                    }
+                    if (q.progress < q.target) {
+                        return message.reply('❌ Nhiệm vụ này chưa hoàn thành!');
+                    }
+
+                    q.claimed = true;
+                    totalReward += q.reward;
+                    claimedCount++;
+                }
+
+                if (claimedCount === 0) {
+                    return message.reply('❌ Không có nhiệm vụ nào đủ điều kiện nhận thưởng!');
+                }
+
+                user.coins += totalReward;
+                user.markModified('quests');
+                await user.save();
+
+                return message.reply(`🎉 Bạn đã nhận thành công **${totalReward}**${COIN_EMOJI} từ nhiệm vụ!`);
+            }
+
+            // Hiển thị danh sách Nhiệm vụ
+            const now = Date.now();
+            const TWELVE_HOURS = 12 * 60 * 60 * 1000;
+            const timeLeftMs = Math.max(0, TWELVE_HOURS - (now - user.questResetAt));
+            const hoursLeft = Math.floor(timeLeftMs / (1000 * 60 * 60));
+            const minutesLeft = Math.floor((timeLeftMs % (1000 * 60 * 60)) / (1000 * 60));
+
+            let questListText = '';
+            user.quests.forEach((q, i) => {
+                const isDone = q.progress >= q.target;
+                const statusIcon = q.claimed ? '✅ (Đã nhận)' : (isDone ? '✨ (Hoàn thành - Sẵn sàng nhận)' : '⏳ (Đang làm)');
+                questListText += `**${i + 1}.${q.desc}**\n• Tiến độ: \`${q.progress}/${q.target}\` - Trạng thái: ${statusIcon}\n• Phần thưởng: **${q.reward}**${COIN_EMOJI}\n\n`;
+            });
+
+            const embed = new EmbedBuilder()
+                .setTitle(`📜 NHIỆM VỤ HÀNG NGÀY (Của ${message.author.username})`)
+                .setDescription(questListText)
+                .setFooter({ text: `Nhiệm vụ làm mới sau: ${hoursLeft}h ${minutesLeft}m \vert{} Gõ ${currentPrefix}quest nhan <STT/all> để nhận` })
+                .setColor(0x3498DB);
+
+            return message.channel.send({ embeds: [embed] });
+        }
+
+        // LỆNH XEM VƯỜN ĐẤT TRỒNG (!vuon hoặc !v)
         if (command === 'vuon' || command === 'v') {
             const user = await getUser(message.author.id);
             if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
@@ -296,19 +380,18 @@ client.on('messageCreate', async (message) => {
                     const plantInfo = PLANTS[plot.plantKey];
 
                     if (now >= plot.harvestAt) {
-                        plotEmojis.push('✨'); // Đã chín
+                        plotEmojis.push('✨');
                         detailList.push(`• Ô ${i + 1}: **${plantInfo.name}** (✨ Đã chín - sẵn sàng thu hoạch)`);
                     } else {
-                        plotEmojis.push('🪻'); // Mầm cây đang lớn
+                        plotEmojis.push('🪻');
                         const timeLeftSec = Math.ceil((plot.harvestAt - now) / 1000);
                         detailList.push(`• Ô ${i + 1}: **${plantInfo.name}** (🪻 Đang lớn - còn ${timeLeftSec}s)`);
                     }
                 } else {
-                    plotEmojis.push('🟫'); // Đất trống
+                    plotEmojis.push('🟫');
                 }
             }
 
-            // Định dạng hiển thị dạng lưới (Dòng 1: 3 ô, Dòng 2: 2 ô)
             const row1 = plotEmojis.slice(0, 3).join('  ');
             const row2 = plotEmojis.slice(3, 5).join('  ');
             const gardenGrid = `${row1}\n${row2}`;
@@ -393,7 +476,7 @@ client.on('messageCreate', async (message) => {
             return message.channel.send({ embeds: [embed] });
         }
 
-        // TÚI ĐỒ
+        // TÚI ĐỒ (SỬA ĐỔI 2: Hiện Emoji MeoCoin ở Ví Tiền)
         if (command === 'tui' || command === 't') {
             const user = await getUser(message.author.id);
             if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
@@ -441,7 +524,7 @@ client.on('messageCreate', async (message) => {
                 .setTitle(`🎒 Hành Trang Của ${message.author.username}`)
                 .setColor(0xD2B48C)
                 .addFields(
-                    { name: '💰 Ví tiền', value: `${user.coins} xu` },
+                    { name: '💰 Ví tiền', value: `${user.coins}${COIN_EMOJI}` },
                     { name: '🌱 Đất trồng', value: `Tổng: **${user.plots.length}/${user.maxPlots}** ô (Chín: ${readyPlots}, Đang lớn: ${growingPlots})\n👉 Gõ \`${currentPrefix}vuon\` để xem sơ đồ đất` },
                     { name: '📦 Vật phẩm', value: invText },
                     { name: '🐾 Ổ Mèo', value: catList }
@@ -450,24 +533,24 @@ client.on('messageCreate', async (message) => {
             return message.channel.send({ embeds: [embed] });
         }
 
-        // SHOP
+        // SHOP (SỬA ĐỔI 2: Hiện Emoji MeoCoin ở Cửa Hàng)
         if (command === 'shop' || command === 's') {
             const user = await getUser(message.author.id);
             const userCoins = user ? user.coins : 0;
 
             const embed = new EmbedBuilder()
                 .setTitle('🏪 Tiệm Tạp Hóa Cây & Mèo')
-                .setDescription(`💰 **Số tiền hiện có của bạn:** \`${userCoins} xu\`\n\nDùng lệnh \`${currentPrefix}mua <tên_món> [số_lượng]\` để mua:`)
+                .setDescription(`💰 **Số tiền hiện có của bạn:** \`${userCoins}\` ${COIN_EMOJI}\n\nDùng lệnh \`${currentPrefix}mua <tên_món> [số_lượng]\` để mua:`)
                 .setColor(0x98FB98)
                 .addFields(
-                    { name: '🌱 Hạt Giống', value: '• `hatgiong_lua`: 10 xu\n• `hatgiong_tra`: 30 xu\n• `hatgiong_mia`: 55 xu\n• `hatgiong_caphe`: 100 xu\n• `hatgiong_tre`: 200 xu' },
-                    { name: '🐟 Thức Ăn', value: '• `thucan`: 30 xu (+15 XP cho mèo)' }
+                    { name: '🌱 Hạt Giống', value: `• \`hatgiong_lua\`: 10 ${COIN_EMOJI}\n• \`hatgiong_tra\`: 30 ${COIN_EMOJI}\n• \`hatgiong_mia\`: 55 ${COIN_EMOJI}\n• \`hatgiong_caphe\`: 100 ${COIN_EMOJI}\n• \`hatgiong_tre\`: 200 ${COIN_EMOJI}` },
+                    { name: '🐟 Thức Ăn', value: `• \`thucan\`: 30 ${COIN_EMOJI} (+15 XP cho mèo)` }
                 );
 
             return message.channel.send({ embeds: [embed] });
         }
 
-        // MUA ĐỒ
+        // MUA ĐỒ (SỬA ĐỔI 2: Emoji MeoCoin)
         if (command === 'mua') {
             const user = await getUser(message.author.id);
             if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
@@ -484,17 +567,17 @@ client.on('messageCreate', async (message) => {
             if (!prices[item]) return message.reply('❌ Vật phẩm không có trong cửa hàng!');
 
             const total = prices[item] * quantity;
-            if (user.coins < total) return message.reply(`❌ Bạn không đủ tiền! Cần **${total} xu**.`);
+            if (user.coins < total) return message.reply(`❌ Bạn không đủ tiền! Cần **${total}**${COIN_EMOJI}.`);
 
             user.coins -= total;
             user.inventory[item] = (user.inventory[item] || 0) + quantity;
             user.markModified('inventory');
             await user.save();
 
-            return message.reply(`🛒 Bạn đã mua thành công **${quantity}x${item}** với giá **${total} xu**!`);
+            return message.reply(`🛒 Bạn đã mua thành công **${quantity}x${item}** với giá **${total}**${COIN_EMOJI}!`);
         }
 
-        // RÚT TIỀN TỪ MÈO
+        // RÚT TIỀN TỪ MÈO (SỬA ĐỔI 2: Emoji MeoCoin)
         if (command === 'kiemtien' || command === 'kt') {
             const user = await getUser(message.author.id);
             if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
@@ -520,13 +603,13 @@ client.on('messageCreate', async (message) => {
 
             const totalEarned = Math.floor(timePassedSec * totalIncomePerSec);
 
-            if (totalEarned <= 0) return message.reply('🪙 Đàn mèo chưa tích lũy đủ xu!');
+            if (totalEarned <= 0) return message.reply(`🐾 Đàn mèo chưa tích lũy đủ ${COIN_EMOJI}!`);
 
             user.coins += totalEarned;
             user.lastClaimCatCoins = now;
             await user.save();
 
-            return message.reply(`🐾 Đàn mèo đã chăm chỉ tích lũy! Bạn rút được **${totalEarned} xu** trong chuồng!`);
+            return message.reply(`🐾 Đàn mèo đã chăm chỉ tích lũy! Bạn rút được **${totalEarned}**${COIN_EMOJI} trong chuồng!`);
         }
 
         // CHO MÈO ĂN
@@ -647,7 +730,7 @@ client.on('messageCreate', async (message) => {
             return message.reply(resultMsg);
         }
 
-        // BÁN NÔNG SẢN
+        // BÁN NÔNG SẢN (SỬA ĐỔI 2: Emoji MeoCoin)
         if (command === 'ban' || command === 'b') {
             const user = await getUser(message.author.id);
             if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
@@ -674,10 +757,10 @@ client.on('messageCreate', async (message) => {
             user.markModified('inventory');
             await user.save();
 
-            return message.reply(`💰 Bạn đã bán **${quantity}x ${item}** thu về **${earnings} xu**!`);
+            return message.reply(`💰 Bạn đã bán **${quantity}x ${item}** thu về **${earnings}** ${COIN_EMOJI}!`);
         }
 
-        // PHA CHẾ
+        // PHA CHẾ (SỬA ĐỔI 2: Emoji MeoCoin)
         if (command === 'phache' || command === 'pha') {
             const user = await getUser(message.author.id);
             if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
@@ -703,10 +786,10 @@ client.on('messageCreate', async (message) => {
             user.markModified('inventory');
             await user.save();
 
-            return message.reply(`🍵 Đã pha thành công **${recipe.name}**! Bạn có thể dùng \`${currentPrefix}ban${drinkKey}\` để bán với giá **${recipe.price} xu**.`);
+            return message.reply(`🍵 Đã pha thành công **${recipe.name}**! Bạn có thể dùng \`${currentPrefix}ban${drinkKey}\` để bán với giá **${recipe.price}** ${COIN_EMOJI}.`);
         }
 
-        // ĐIỂM DANH
+        // ĐIỂM DANH (SỬA ĐỔI 2: Emoji MeoCoin)
         if (command === 'diemdanh' || command === 'dd') {
             const user = await getUser(message.author.id);
             if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
@@ -726,7 +809,7 @@ client.on('messageCreate', async (message) => {
             user.coins += reward;
             await user.save();
 
-            return message.channel.send(`🍵 ${message.author} thưởng trà sáng và nhận **${reward} xu**!`);
+            return message.channel.send(`🍵 ${message.author} thưởng trà sáng và nhận **${reward}** ${COIN_EMOJI}!`);
         }
 
         // KÊNH SPAWN MÈO
