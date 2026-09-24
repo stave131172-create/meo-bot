@@ -114,7 +114,7 @@ function getCatInfo(rawName) {
     };
 }
 
-// TÍNH NĂNG NHIỆM VỤ (QUESTS RESET MỖI 12 GIỜ)
+// SỬA ĐỔI 1: TÍNH NĂNG NHIỆM VỤ (QUESTS RESET MỖI 12 GIỜ)
 function checkAndResetQuests(user) {
     const now = Date.now();
     const TWELVE_HOURS = 12 * 60 * 60 * 1000;
@@ -122,6 +122,7 @@ function checkAndResetQuests(user) {
     if (!user.questResetAt || now - user.questResetAt >= TWELVE_HOURS) {
         user.questResetAt = now;
         
+        // Sinh ngẫu nhiên số lượng nhiệm vụ cần thực hiện
         const plantTarget = Math.floor(Math.random() * 6) + 5; // 5 - 10 cây
         const catchTarget = Math.floor(Math.random() * 2) + 1; // 1 - 2 mèo
         const brewTarget = Math.floor(Math.random() * 3) + 1;  // 1 - 3 ly nước
@@ -260,7 +261,7 @@ client.on('messageCreate', async (message) => {
             return message.channel.send('⚠️ **ĐÃ RESET TOÀN BỘ DỮ LIỆU CỦA TẤT CẢ NGƯỜI CHƠI TRÊN MỌI SERVER VỀ MẶC ĐỊNH!**');
         }
 
-        // 📌 LỆNH HELP (ĐÃ THÊM GIF VÀO EMBED)
+        // 📌 LỆNH HELP
         if (command === 'help' || command === 'h') {
             const p = currentPrefix;
             const embed = new EmbedBuilder()
@@ -285,13 +286,12 @@ client.on('messageCreate', async (message) => {
                         value: `• \`${p}setprefix <prefix_mới>\`: Thay đổi prefix riêng cho server này.\n• \`${p}setchannel\`: Cài đặt kênh này làm nơi mèo xuất hiện.` 
                     }
                 )
-                .setImage('https://64.media.tumblr.com/b7fe4e7380ad5ead6b5b923dda4a57be/0a55b5030b869431-19/s1280x1920/67ca2429b7d137a9b7b808e8d820ef4a8be79255.gif')
                 .setFooter({ text: 'Chúc bạn chơi game vui vẻ!' });
 
             return message.channel.send({ embeds: [embed] });
         }
 
-        // LỆNH NHIỆM VỤ (!quest / !q / !nhiemvu)
+        // SỬA ĐỔI 1: LỆNH NHIỆM VỤ (!quest / !q / !nhiemvu)
         if (command === 'quest' || command === 'q' || command === 'nhiemvu') {
             const user = await getUser(message.author.id);
             if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
@@ -476,7 +476,7 @@ client.on('messageCreate', async (message) => {
             return message.channel.send({ embeds: [embed] });
         }
 
-        // TÚI ĐỒ
+        // TÚI ĐỒ (SỬA ĐỔI 2: Hiện Emoji MeoCoin ở Ví Tiền)
         if (command === 'tui' || command === 't') {
             const user = await getUser(message.author.id);
             if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
@@ -533,7 +533,7 @@ client.on('messageCreate', async (message) => {
             return message.channel.send({ embeds: [embed] });
         }
 
-        // SHOP
+        // SHOP (Thêm gif hình ảnh cho shop)
         if (command === 'shop' || command === 's') {
             const user = await getUser(message.author.id);
             const userCoins = user ? user.coins : 0;
@@ -542,6 +542,7 @@ client.on('messageCreate', async (message) => {
                 .setTitle('🏪 Tiệm Tạp Hóa Cây & Mèo')
                 .setDescription(`💰 **Số tiền hiện có của bạn:** \`${userCoins}\` ${COIN_EMOJI}\n\nDùng lệnh \`${currentPrefix}mua <tên_món> [số_lượng]\` để mua:`)
                 .setColor(0x98FB98)
+                .setImage('https://wallpaperaccess.com/full/7824075.gif')
                 .addFields(
                     { name: '🌱 Hạt Giống', value: `• \`hatgiong_lua\`: 10 ${COIN_EMOJI}\n• \`hatgiong_tra\`: 30 ${COIN_EMOJI}\n• \`hatgiong_mia\`: 55 ${COIN_EMOJI}\n• \`hatgiong_caphe\`: 100 ${COIN_EMOJI}\n• \`hatgiong_tre\`: 200 ${COIN_EMOJI}` },
                     { name: '🐟 Thức Ăn', value: `• \`thucan\`: 30 ${COIN_EMOJI} (+15 XP cho mèo)` }
@@ -550,7 +551,7 @@ client.on('messageCreate', async (message) => {
             return message.channel.send({ embeds: [embed] });
         }
 
-        // MUA ĐỒ
+        // MUA ĐỒ (SỬA ĐỔI 2: Emoji MeoCoin)
         if (command === 'mua') {
             const user = await getUser(message.author.id);
             if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
@@ -577,7 +578,7 @@ client.on('messageCreate', async (message) => {
             return message.reply(`🛒 Bạn đã mua thành công **${quantity}x${item}** với giá **${total}**${COIN_EMOJI}!`);
         }
 
-        // RÚT TIỀN TỪ MÈO
+        // RÚT TIỀN TỪ MÈO (SỬA ĐỔI 2: Emoji MeoCoin)
         if (command === 'kiemtien' || command === 'kt') {
             const user = await getUser(message.author.id);
             if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
@@ -730,7 +731,7 @@ client.on('messageCreate', async (message) => {
             return message.reply(resultMsg);
         }
 
-        // BÁN NÔNG SẢN
+        // BÁN NÔNG SẢN (SỬA ĐỔI 2: Emoji MeoCoin)
         if (command === 'ban' || command === 'b') {
             const user = await getUser(message.author.id);
             if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
@@ -760,7 +761,7 @@ client.on('messageCreate', async (message) => {
             return message.reply(`💰 Bạn đã bán **${quantity}x ${item}** thu về **${earnings}** ${COIN_EMOJI}!`);
         }
 
-        // PHA CHẾ
+        // PHA CHẾ (SỬA ĐỔI 2: Emoji MeoCoin)
         if (command === 'phache' || command === 'pha') {
             const user = await getUser(message.author.id);
             if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
@@ -789,7 +790,7 @@ client.on('messageCreate', async (message) => {
             return message.reply(`🍵 Đã pha thành công **${recipe.name}**! Bạn có thể dùng \`${currentPrefix}ban${drinkKey}\` để bán với giá **${recipe.price}** ${COIN_EMOJI}.`);
         }
 
-        // ĐIỂM DANH
+        // ĐIỂM DANH (SỬA ĐỔI 2: Emoji MeoCoin)
         if (command === 'diemdanh' || command === 'dd') {
             const user = await getUser(message.author.id);
             if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
