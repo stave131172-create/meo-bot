@@ -23,8 +23,7 @@ const userSchema = new mongoose.Schema({
     lastDiemDanh: { type: Number, default: 0 },
     lastClaimCatCoins: { type: Number, default: Date.now() },
     questResetAt: { type: Number, default: 0 },
-    quests: { type: Array, default: [] },
-    claimedSecretMinn: { type: Boolean, default: false } // SỬA ĐỔI 2: Đánh dấu đã nhận Mèo Minn
+    quests: { type: Array, default: [] }
 });
 
 const configSchema = new mongoose.Schema({
@@ -63,9 +62,7 @@ const CAT_TYPES = [
     { name: 'Mèo Trà Xanh', rarity: 'Hiếm', rate: 10, emoji: '<:meotraxanh:1551974270505189426>', image: 'https://i.pinimg.com/736x/a2/06/ad/a206ad186aed59dff16bbce4bdff424b.jpg', incomePerSec: 0.07 },
     { name: 'Mèo Maine Coon', rarity: 'Cực Hiếm', rate: 8, emoji: '<:meomarinecoon:1551974053542109204>', image: 'https://i.pinimg.com/736x/65/e6/e9/65e6e9bf4946447e0af173e6d340c908.jpg', incomePerSec: 0.15 },
     { name: 'Mèo Lofi Nghe Nhạc', rarity: 'Cực Hiếm', rate: 8, emoji: '<:meolofi:1551974186455670865>', image: 'https://i.pinimg.com/736x/b3/12/89/b3128925bda713b4303f89b9c2d62744.jpg', incomePerSec: 0.15 },
-    { name: 'Mèo Hoàng Gia', rarity: 'Huyền Thoại', rate: 5, emoji: '<:meohoanggia:1551973577153314966>', image: 'https://i.pinimg.com/1200x/2b/05/9e/2b059e2fbcf5c9087bf1e8f1f2a17165.jpg', incomePerSec: 0.4 },
-    // SỬA ĐỔI 2: Mèo Limited Minn
-    { name: 'Minn', rarity: 'Limited', rate: 0, emoji: '<:mminn:1552317146288234526>', image: 'https://i.pinimg.com/736x/07/b6/a3/07b6a3f30f4d65a60c35a6e58d46660b.jpg', incomePerSec: 100 }
+    { name: 'Mèo Hoàng Gia', rarity: 'Huyền Thoại', rate: 5, emoji: '<:meohoanggia:1551973577153314966>', image: 'https://i.pinimg.com/1200x/2b/05/9e/2b059e2fbcf5c9087bf1e8f1f2a17165.jpg', incomePerSec: 0.4 }
 ];
 
 const RECIPES = {
@@ -76,7 +73,7 @@ const RECIPES = {
 
 const MAX_CAT_LEVEL = 10;
 
-// SỬA ĐỔI 1: Quản lý Prefix Động
+// Quản lý Prefix Động
 let DEFAULT_PREFIX = '!';
 
 async function getPrefix() {
@@ -180,13 +177,11 @@ async function spawnCatTask() {
         const channel = await client.channels.fetch(channelConfig.value).catch(() => null);
         if (!channel) return;
 
-        // Bỏ qua mèo Limited khi spawn ngẫu nhiên
-        const spawnableCats = CAT_TYPES.filter(c => c.rarity !== 'Limited');
         const rand = Math.floor(Math.random() * 100) + 1;
         let cumulative = 0;
-        let selectedCat = spawnableCats[0];
+        let selectedCat = CAT_TYPES[0];
 
-        for (const cat of spawnableCats) {
+        for (const cat of CAT_TYPES) {
             cumulative += cat.rate;
             if (rand <= cumulative) {
                 selectedCat = cat;
@@ -222,9 +217,7 @@ client.on('messageCreate', async (message) => {
         const args = content.startsWith(currentPrefix) ? content.slice(currentPrefix.length).trim().split(/ +/) : [content];
         const command = args.shift().toLowerCase();
 
-        // -------------------------------------------------------------
-        // SỬA ĐỔI 1: Lệnh Admin thay đổi Prefix (!setprefix)
-        // -------------------------------------------------------------
+        // Lệnh Admin thay đổi Prefix (!setprefix)
         if (command === 'setprefix') {
             if (!message.member?.permissions?.has('Administrator')) {
                 return message.reply('❌ Bạn cần quyền **Administrator** để thay đổi Prefix!');
@@ -238,39 +231,7 @@ client.on('messageCreate', async (message) => {
             return message.channel.send(`⚙️ **Đã đổi Prefix thành công!** Từ nay tiền tố lệnh mới là: \`${newPrefix}\``);
         }
 
-        // -------------------------------------------------------------
-        // SỬA ĐỔI 2: Lệnh Bí Mật (!Mmien) nhận Mèo Limited Minn
-        // -------------------------------------------------------------
-        if (command === 'mmien') {
-            const user = await getUser(message.author.id);
-            if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
-
-            if (user.claimedSecretMinn) {
-                return message.reply('⚠️ Bạn đã mở khóa câu lệnh bí mật này và sở hữu mèo **Minn** rồi!');
-            }
-
-            const minnData = CAT_TYPES.find(c => c.name === 'Minn');
-            user.cats.push({ name: minnData.name, rarity: minnData.rarity, level: 1, xp: 0 });
-            user.claimedSecretMinn = true;
-            user.markModified('cats');
-            await user.save();
-
-            const embed = new EmbedBuilder()
-                .setTitle('✨ BẠN ĐÃ MỞ KHÓA MÈO BÍ MẬT LIMITED! ✨')
-                .setDescription(
-                    `Chúc mừng bạn đã khám phá ra câu lệnh bí mật!\n` +
-                    `Bạn vừa nhận được **${minnData.emoji}${minnData.name}**!\n\n` +
-                    `⚡ **Tốc độ tạo xu:** \`${minnData.incomePerSec} xu/giây\`\n` +
-                    `🔝 **Lvl Tối đa:** \`${MAX_CAT_LEVEL}\``
-                )
-                .setImage(minnData.image)
-                .setColor(0x9370DB)
-                .setFooter({ text: `Yêu cầu bởi: ${message.author.username}`, iconURL: message.author.displayAvatarURL() });
-
-            return message.channel.send({ embeds: [embed] });
-        }
-
-        // 📌 LỆNH HELP (ĐÃ CẬP NHẬT PREFIX ĐỘNG)
+        // 📌 LỆNH HELP
         if (command === 'help' || command === 'h') {
             const p = currentPrefix;
             const embed = new EmbedBuilder()
@@ -311,8 +272,7 @@ client.on('messageCreate', async (message) => {
                     cats: [],
                     inventory: { hatgiong_lua: 2, thucan: 2 },
                     plots: [],
-                    lastClaimCatCoins: Date.now(),
-                    claimedSecretMinn: false
+                    lastClaimCatCoins: Date.now()
                 }
             });
             return message.channel.send('⚠️ **ĐÃ RESET TIỀN VÀ TÚI MÈO CỦA TOÀN BỘ NGƯỜI CHƠI VỀ MẶC ĐỊNH (20 xu)!**');
