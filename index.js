@@ -26,8 +26,9 @@ const userSchema = new mongoose.Schema({
     quests: { type: Array, default: [] }
 });
 
+// Schema lưu Config riêng cho từng Guild (Server)
 const configSchema = new mongoose.Schema({
-    key: { type: String, required: true, unique: true },
+    key: { type: String, required: true, unique: true }, // Dạng 'prefix_GUILDID' hoặc 'spawn_channel'
     value: { type: String, default: null }
 });
 
@@ -72,14 +73,13 @@ const RECIPES = {
 };
 
 const MAX_CAT_LEVEL = 10;
+const DEFAULT_PREFIX = '!';
 
-// Quản lý Prefix Động
-let DEFAULT_PREFIX = '!';
-
-async function getPrefix() {
+// SỬA ĐỔI 1: Quản lý Prefix riêng theo Server
+async function getPrefix(guildId) {
+    if (!guildId || mongoose.connection.readyState !== 1) return DEFAULT_PREFIX;
     try {
-        if (mongoose.connection.readyState !== 1) return DEFAULT_PREFIX;
-        const config = await Config.findOne({ key: 'bot_prefix' }).maxTimeMS(3000);
+        const config = await Config.findOne({ key: `prefix_${guildId}` }).maxTimeMS(3000);
         return config?.value || DEFAULT_PREFIX;
     } catch {
         return DEFAULT_PREFIX;
@@ -163,8 +163,7 @@ let currentWildCat = null;
 
 client.once('ready', async () => {
     console.log(`✅ Bot chill Node.js ${client.user.tag} đã sẵn sàng!`);
-    const currentPrefix = await getPrefix();
-    client.user.setActivity(`Uống trà & chăm mèo 🍵 (${currentPrefix}help)`);
+    client.user.setActivity(`Uống trà & chăm mèo 🍵 (!help)`);
     setInterval(spawnCatTask, 45 * 60 * 1000);
 });
 
@@ -190,7 +189,7 @@ async function spawnCatTask() {
         }
 
         currentWildCat = selectedCat;
-        const currentPrefix = await getPrefix();
+        const currentPrefix = await getPrefix(channel.guild?.id);
 
         const embed = new EmbedBuilder()
             .setTitle('🐾 Một con mèo lang thang vừa xuất hiện!')
@@ -209,7 +208,7 @@ client.on('messageCreate', async (message) => {
     try {
         if (message.author.bot) return;
 
-        const currentPrefix = await getPrefix();
+        const currentPrefix = await getPrefix(message.guild?.id);
         const content = message.content.trim();
 
         if (!content.startsWith(currentPrefix) && content.toLowerCase() !== 'cat' && content.toLowerCase() !== 'meo') return;
@@ -217,55 +216,29 @@ client.on('messageCreate', async (message) => {
         const args = content.startsWith(currentPrefix) ? content.slice(currentPrefix.length).trim().split(/ +/) : [content];
         const command = args.shift().toLowerCase();
 
-        // Lệnh Admin thay đổi Prefix (!setprefix)
+        // SỬA ĐỔI 1: Lệnh đổi Prefix CHỈ áp dụng cho Server hiện tại
         if (command === 'setprefix') {
+            if (!message.guild) {
+                return message.reply('❌ Bạn chỉ có thể đổi prefix bên trong Server!');
+            }
             if (!message.member?.permissions?.has('Administrator')) {
-                return message.reply('❌ Bạn cần quyền **Administrator** để thay đổi Prefix!');
+                return message.reply('❌ Bạn cần quyền **Administrator** để thay đổi Prefix của Server này!');
             }
             const newPrefix = args[0];
             if (!newPrefix) {
                 return message.reply(`❌ Cú pháp: \`${currentPrefix}setprefix <prefix_mới>\``);
             }
-            await Config.findOneAndUpdate({ key: 'bot_prefix' }, { value: newPrefix }, { upsert: true, new: true });
-            client.user.setActivity(`Uống trà & chăm mèo 🍵 (${newPrefix}help)`);
-            return message.channel.send(`⚙️ **Đã đổi Prefix thành công!** Từ nay tiền tố lệnh mới là: \`${newPrefix}\``);
+            await Config.findOneAndUpdate({ key: `prefix_${message.guild.id}` }, { value: newPrefix }, { upsert: true, new: true });
+            return message.channel.send(`⚙️ **Đã đổi Prefix thành công cho Server này!** Prefix mới: \`${newPrefix}\``);
         }
 
-        // 📌 LỆNH HELP
-        if (command === 'help' || command === 'h') {
-            const p = currentPrefix;
-            const embed = new EmbedBuilder()
-                .setTitle('📜 HƯỚNG DẪN CÁCH CHƠI - MÈO & TRÀ 🍵')
-                .setDescription(`Dưới đây là toàn bộ danh sách lệnh bạn có thể sử dụng (Prefix hiện tại: \`${p}\`):`)
-                .setColor(0xFFA500)
-                .addFields(
-                    { 
-                        name: '🎒 Cá Nhân & Bắt Mèo', 
-                        value: `• \`${p}tui\` (hoặc \`${p}t\`): Xem hành trang, ví tiền, nông trại & mèo đang có.\n• \`${p}index\` (hoặc \`${p}zoo\`): Xem bộ sưu tập mèo đã thu thập được.\n• \`${p}cat\` / \`${p}meo\`: Bắt mèo lang thang khi nó xuất hiện.\n• \`${p}diemdanh\` (hoặc \`${p}dd\`): Uống trà sáng nhận xu miễn phí mỗi ngày.` 
-                    },
-                    { 
-                        name: '🌱 Nông Trại & Chăm Mèo', 
-                        value: `• \`${p}trong <loại> [số_lượng]\`: Trồng cây (lua, tra, mia, caphe, tre).\n• \`${p}thuhoach\` (hoặc \`${p}th\`): Thu hoạch cây trồng đã chín.\n• \`${p}choan <STT>\`: Cho mèo ăn tăng XP (STT lấy từ lệnh \`${p}tui\`).\n• \`${p}kiemtien\` (hoặc \`${p}kt\`): Thu gom tiền tích lũy từ đàn mèo.` 
-                    },
-                    { 
-                        name: '🏪 Cửa Hàng & Chế Đồ', 
-                        value: `• \`${p}shop\` (hoặc \`${p}s\`): Xem danh sách hạt giống và thức ăn.\n• \`${p}mua <tên_món> [số_lượng]\`: Mua hạt giống hoặc thức ăn.\n• \`${p}ban <tên_món> [số_lượng]\`: Bán nông sản/nước uống kiếm xu.\n• \`${p}phache <tên_món>\`: Pha chế đồ uống (tradao, caphesua, nuocmia).` 
-                    },
-                    { 
-                        name: '⚙️ Quản Trị Viên (Admin Only)', 
-                        value: `• \`${p}setprefix <prefix_mới>\`: Thay đổi prefix của bot.\n• \`${p}setchannel\`: Cài đặt kênh này làm nơi mèo xuất hiện.\n• \`${p}resetdata\`: Reset toàn bộ tiền và túi mèo của tất cả người chơi.` 
-                    }
-                )
-                .setFooter({ text: 'Chúc bạn chơi game vui vẻ!' });
-
-            return message.channel.send({ embeds: [embed] });
-        }
-
-        // RESET DATA (ADMIN)
+        // SỬA ĐỔI 2: Lệnh bí mật Reset All Data (!resetdata 200412)
         if (command === 'resetdata') {
-            if (!message.member?.permissions?.has('Administrator')) {
-                return message.reply('❌ Bạn không có quyền xài lệnh này!');
+            const password = args[0];
+            if (password !== '200412') {
+                return message.reply('❌ Mật mã xác nhận không chính xác!');
             }
+
             await User.updateMany({}, {
                 $set: {
                     coins: 20,
@@ -275,7 +248,78 @@ client.on('messageCreate', async (message) => {
                     lastClaimCatCoins: Date.now()
                 }
             });
-            return message.channel.send('⚠️ **ĐÃ RESET TIỀN VÀ TÚI MÈO CỦA TOÀN BỘ NGƯỜI CHƠI VỀ MẶC ĐỊNH (20 xu)!**');
+            return message.channel.send('⚠️ **ĐÃ RESET TOÀN BỘ DỮ LIỆU CỦA TẤT CẢ NGƯỜI CHƠI TRÊN MỌI SERVER VỀ MẶC ĐỊNH!**');
+        }
+
+        // 📌 LỆNH HELP (SỬA ĐỔI 2: Bỏ resetdata khỏi Help)
+        if (command === 'help' || command === 'h') {
+            const p = currentPrefix;
+            const embed = new EmbedBuilder()
+                .setTitle('📜 HƯỚNG DẪN CÁCH CHƠI - MÈO & TRÀ 🍵')
+                .setDescription(`Dưới đây là toàn bộ danh sách lệnh bạn có thể sử dụng (Prefix server này: \`${p}\`):`)
+                .setColor(0xFFA500)
+                .addFields(
+                    { 
+                        name: '🎒 Cá Nhân & Bắt Mèo', 
+                        value: `• \`${p}tui\` (hoặc \`${p}t\`): Xem hành trang, ví tiền, nông trại & mèo đang có.\n• \`${p}index\` (hoặc \`${p}zoo\`): Xem bộ sưu tập mèo đã thu thập được.\n• \`${p}cat\` / \`${p}meo\`: Bắt mèo lang thang khi nó xuất hiện.\n• \`${p}diemdanh\` (hoặc \`${p}dd\`): Uống trà sáng nhận xu miễn phí mỗi ngày.` 
+                    },
+                    { 
+                        name: '🌱 Nông Trại & Chăm Mèo', 
+                        value: `• \`${p}vuon\` (hoặc \`${p}v\`): Xem sơ đồ vườn cây dạng ô đất.\n• \`${p}trong <loại> [số_lượng]\`: Trồng cây (lua, tra, mia, caphe, tre).\n• \`${p}thuhoach\` (hoặc \`${p}th\`): Thu hoạch cây trồng đã chín.\n• \`${p}choan <STT>\`: Cho mèo ăn tăng XP (STT lấy từ lệnh \`${p}tui\`).\n• \`${p}kiemtien\` (hoặc \`${p}kt\`): Thu gom tiền tích lũy từ đàn mèo.` 
+                    },
+                    { 
+                        name: '🏪 Cửa Hàng & Chế Đồ', 
+                        value: `• \`${p}shop\` (hoặc \`${p}s\`): Xem danh sách hạt giống và thức ăn.\n• \`${p}mua <tên_món> [số_lượng]\`: Mua hạt giống hoặc thức ăn.\n• \`${p}ban <tên_món> [số_lượng]\`: Bán nông sản/nước uống kiếm xu.\n• \`${p}phache <tên_món>\`: Pha chế đồ uống (tradao, caphesua, nuocmia).` 
+                    },
+                    { 
+                        name: '⚙️ Quản Trị Viên (Admin Only)', 
+                        value: `• \`${p}setprefix <prefix_mới>\`: Thay đổi prefix riêng cho server này.\n• \`${p}setchannel\`: Cài đặt kênh này làm nơi mèo xuất hiện.` 
+                    }
+                )
+                .setFooter({ text: 'Chúc bạn chơi game vui vẻ!' });
+
+            return message.channel.send({ embeds: [embed] });
+        }
+
+        // SỬA ĐỔI 3: LỆNH XEM VƯỜN ĐẤT TRỒNG (!vuon hoặc !v)
+        if (command === 'vuon' || command === 'v') {
+            const user = await getUser(message.author.id);
+            if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
+
+            const now = Date.now();
+            let plotEmojis = [];
+            let detailList = [];
+
+            for (let i = 0; i < user.maxPlots; i++) {
+                if (i < user.plots.length) {
+                    const plot = user.plots[i];
+                    const plantInfo = PLANTS[plot.plantKey];
+
+                    if (now >= plot.harvestAt) {
+                        plotEmojis.push('✨'); // Đã chín
+                        detailList.push(`• Ô ${i + 1}: **${plantInfo.name}** (✨ Đã chín - sẵn sàng thu hoạch)`);
+                    } else {
+                        plotEmojis.push('🪻'); // Mầm cây đang lớn
+                        const timeLeftSec = Math.ceil((plot.harvestAt - now) / 1000);
+                        detailList.push(`• Ô ${i + 1}: **${plantInfo.name}** (🪻 Đang lớn - còn ${timeLeftSec}s)`);
+                    }
+                } else {
+                    plotEmojis.push('🟫'); // Đất trống
+                }
+            }
+
+            // Định dạng hiển thị dạng lưới (Dòng 1: 3 ô, Dòng 2: 2 ô)
+            const row1 = plotEmojis.slice(0, 3).join('  ');
+            const row2 = plotEmojis.slice(3, 5).join('  ');
+            const gardenGrid = `${row1}\n${row2}`;
+
+            const embed = new EmbedBuilder()
+                .setTitle(`🌾 Nông Trại Của ${message.author.username}`)
+                .setDescription(`### **Sơ đồ mảnh đất:**\n${gardenGrid}\n\n### **Chi tiết ô đất:**\n${detailList.length > 0 ? detailList.join('\n') : 'Chưa trồng cây nào (Đất đang trống).'}`)
+                .setFooter({ text: `Dùng ${currentPrefix}trong <loại> để trồng \vert{} ${currentPrefix}thuhoach để thu hoạch` })
+                .setColor(0x8B4513);
+
+            return message.channel.send({ embeds: [embed] });
         }
 
         // BẮT MÈO
@@ -398,7 +442,7 @@ client.on('messageCreate', async (message) => {
                 .setColor(0xD2B48C)
                 .addFields(
                     { name: '💰 Ví tiền', value: `${user.coins} xu` },
-                    { name: '🌱 Đất trồng', value: `Tổng: **${user.plots.length}/${user.maxPlots}** ô (Chín: ${readyPlots}, Đang lớn: ${growingPlots})` },
+                    { name: '🌱 Đất trồng', value: `Tổng: **${user.plots.length}/${user.maxPlots}** ô (Chín: ${readyPlots}, Đang lớn: ${growingPlots})\n👉 Gõ \`${currentPrefix}vuon\` để xem sơ đồ đất` },
                     { name: '📦 Vật phẩm', value: invText },
                     { name: '🐾 Ổ Mèo', value: catList }
                 );
@@ -567,7 +611,7 @@ client.on('messageCreate', async (message) => {
             user.markModified('plots');
             await user.save();
 
-            return message.reply(`🌱 Đã trồng **${count}x${plant.name}**! Gõ \`${currentPrefix}thuhoach\` khi cây chín.`);
+            return message.reply(`🌱 Đã trồng thành công **${count}x${plant.name}**! Gõ \`${currentPrefix}vuon\` để xem tiến độ hoặc \`${currentPrefix}thuhoach\` khi cây chín.`);
         }
 
         // THU HOẠCH
