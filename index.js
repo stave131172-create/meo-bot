@@ -260,7 +260,7 @@ client.on('messageCreate', async (message) => {
             return message.channel.send('⚠️ **ĐÃ RESET TOÀN BỘ DỮ LIỆU CỦA TẤT CẢ NGƯỜI CHƠI TRÊN MỌI SERVER VỀ MẶC ĐỊNH!**');
         }
 
-        // 📌 LỆNH HELP (ĐÃ KHÔI PHỤC LẠI GIF KHÔNG SỢ MẤT NỮA NHÉ)
+        // 📌 LỆNH HELP
         if (command === 'help' || command === 'h') {
             const p = currentPrefix;
             const embed = new EmbedBuilder()
@@ -533,7 +533,7 @@ client.on('messageCreate', async (message) => {
             return message.channel.send({ embeds: [embed] });
         }
 
-        // SHOP (CÓ ĐỦ CẢ GIF SHOP)
+        // SHOP (CẬP NHẬT GIF MỚI THEO YÊU CẦU)
         if (command === 'shop' || command === 's') {
             const user = await getUser(message.author.id);
             const userCoins = user ? user.coins : 0;
@@ -542,7 +542,7 @@ client.on('messageCreate', async (message) => {
                 .setTitle('🏪 Tiệm Tạp Hóa Cây & Mèo')
                 .setDescription(`💰 **Số tiền hiện có của bạn:** \`${userCoins}\` ${COIN_EMOJI}\n\nDùng lệnh \`${currentPrefix}mua <tên_món> [số_lượng]\` để mua:`)
                 .setColor(0x98FB98)
-                .setImage('https://wallpaperaccess.com/full/7824075.gif')
+                .setImage('https://i.pinimg.com/originals/3a/a4/6f/3aa46f5701fc6ed92234ea0a9f86e2cd.gif')
                 .addFields(
                     { name: '🌱 Hạt Giống', value: `• \`hatgiong_lua\`: 10 ${COIN_EMOJI}\n• \`hatgiong_tra\`: 30 ${COIN_EMOJI}\n• \`hatgiong_mia\`: 55 ${COIN_EMOJI}\n• \`hatgiong_caphe\`: 100 ${COIN_EMOJI}\n• \`hatgiong_tre\`: 200 ${COIN_EMOJI}` },
                     { name: '🐟 Thức Ăn', value: `• \`thucan\`: 30 ${COIN_EMOJI} (+15 XP cho mèo)` }
