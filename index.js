@@ -365,7 +365,7 @@ client.on('messageCreate', async (message) => {
             return message.channel.send({ embeds: [embed] });
         }
 
-        // LỆNH XEM VƯỜN ĐẤT TRỒNG (!vuon hoặc !v)
+        // LỆNH XEM VƯỜN ĐẤT TRỒNG (!vuon hoặc !v) - ĐÃ BỔ SUNG GIF MỚI
         if (command === 'vuon' || command === 'v') {
             const user = await getUser(message.author.id);
             if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
@@ -399,6 +399,7 @@ client.on('messageCreate', async (message) => {
             const embed = new EmbedBuilder()
                 .setTitle(`🌾 Nông Trại Của ${message.author.username}`)
                 .setDescription(`### **Sơ đồ mảnh đất:**\n${gardenGrid}\n\n### **Chi tiết ô đất:**\n${detailList.length > 0 ? detailList.join('\n') : 'Chưa trồng cây nào (Đất đang trống).'}`)
+                .setImage('https://i.pinimg.com/originals/7b/1b/b6/7b1bb67b642f2665a0709a26e57300e1.gif')
                 .setFooter({ text: `Dùng ${currentPrefix}trong <loại> để trồng \vert{} ${currentPrefix}thuhoach để thu hoạch` })
                 .setColor(0x8B4513);
 
@@ -533,7 +534,7 @@ client.on('messageCreate', async (message) => {
             return message.channel.send({ embeds: [embed] });
         }
 
-        // SHOP (CẬP NHẬT GIF MỚI THEO YÊU CẦU)
+        // SHOP
         if (command === 'shop' || command === 's') {
             const user = await getUser(message.author.id);
             const userCoins = user ? user.coins : 0;
