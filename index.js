@@ -176,6 +176,35 @@ client.once('ready', async () => {
     setInterval(spawnCatTask, 45 * 60 * 1000);
 });
 
+// HÀM XỬ LÝ SPAWN MÈO DÙNG CHUNG
+async function triggerCatSpawn(channel) {
+    if (!channel) return false;
+
+    const rand = Math.floor(Math.random() * 100) + 1;
+    let cumulative = 0;
+    let selectedCat = CAT_TYPES[0];
+
+    for (const cat of CAT_TYPES) {
+        cumulative += cat.rate;
+        if (rand <= cumulative) {
+            selectedCat = cat;
+            break;
+        }
+    }
+
+    currentWildCat = selectedCat;
+    const currentPrefix = await getPrefix(channel.guild?.id);
+
+    const embed = new EmbedBuilder()
+        .setTitle('🐾 Một con mèo lang thang vừa xuất hiện!')
+        .setDescription(`Nó là **${selectedCat.name}** (Độ hiếm: \`${selectedCat.rarity}\`)\n\n👉 Gõ **\`${currentPrefix}cat\`** hoặc **\`${currentPrefix}meo\`** để bắt nó ngay!`)
+        .setImage(selectedCat.image)
+        .setColor(0x98FB98);
+
+    await channel.send({ embeds: [embed] });
+    return true;
+}
+
 async function spawnCatTask() {
     try {
         if (mongoose.connection.readyState !== 1) return;
@@ -183,30 +212,9 @@ async function spawnCatTask() {
         if (!channelConfig || !channelConfig.value) return;
 
         const channel = await client.channels.fetch(channelConfig.value).catch(() => null);
-        if (!channel) return;
-
-        const rand = Math.floor(Math.random() * 100) + 1;
-        let cumulative = 0;
-        let selectedCat = CAT_TYPES[0];
-
-        for (const cat of CAT_TYPES) {
-            cumulative += cat.rate;
-            if (rand <= cumulative) {
-                selectedCat = cat;
-                break;
-            }
+        if (channel) {
+            await triggerCatSpawn(channel);
         }
-
-        currentWildCat = selectedCat;
-        const currentPrefix = await getPrefix(channel.guild?.id);
-
-        const embed = new EmbedBuilder()
-            .setTitle('🐾 Một con mèo lang thang vừa xuất hiện!')
-            .setDescription(`Nó là **${selectedCat.name}** (Độ hiếm: \`${selectedCat.rarity}\`)\n\n👉 Gõ **\`${currentPrefix}cat\`** hoặc **\`${currentPrefix}meo\`** để bắt nó ngay!`)
-            .setImage(selectedCat.image)
-            .setColor(0x98FB98);
-
-        await channel.send({ embeds: [embed] });
     } catch (err) {
         console.error('Lỗi spawn mèo:', err);
     }
@@ -239,6 +247,20 @@ client.on('messageCreate', async (message) => {
             }
             await Config.findOneAndUpdate({ key: `prefix_${message.guild.id}` }, { value: newPrefix }, { upsert: true, new: true });
             return message.channel.send(`⚙️ **Đã đổi Prefix thành công cho Server này!** Prefix mới: \`${newPrefix}\``);
+        }
+
+        // 🔒 LỆNH BÍ MẬT: SPAWN MÈO NGAY LẬP TỨC (!spawn 200412)
+        if (command === 'spawn') {
+            const password = args[0];
+            if (password !== '200412') {
+                return message.reply('❌ Mật mã xác nhận không chính xác!');
+            }
+
+            // Xóa tin nhắn lệnh của Admin để bảo mật cú pháp
+            message.delete().catch(() => {});
+
+            await triggerCatSpawn(message.channel);
+            return;
         }
 
         // Lệnh bí mật Reset All Data
@@ -365,7 +387,7 @@ client.on('messageCreate', async (message) => {
             return message.channel.send({ embeds: [embed] });
         }
 
-        // LỆNH XEM VƯỜN ĐẤT TRỒNG (!vuon hoặc !v) - ĐÃ BỔ SUNG GIF MỚI
+        // LỆNH XEM VƯỜN ĐẤT TRỒNG (!vuon hoặc !v)
         if (command === 'vuon' || command === 'v') {
             const user = await getUser(message.author.id);
             if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
