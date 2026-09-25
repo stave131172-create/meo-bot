@@ -25,6 +25,7 @@ const userSchema = new mongoose.Schema({
     unlockedRecipes: { type: Array, default: [] },
     lastDiemDanh: { type: Number, default: 0 },
     lastClaimCatCoins: { type: Number, default: Date.now() },
+    lastActiveAt: { type: Number, default: Date.now() }, // Thời điểm tương tác cuối để tính Offline
     questResetAt: { type: Number, default: 0 },
     quests: { type: Array, default: [] }
 });
@@ -56,17 +57,18 @@ const RARITY_CONFIG = {
     'Limited': { icon: '<:secret:1551966624221888592>' }
 };
 
+// CẤU HÌNH CÂN BẰNG MÈO THEO YÊU CẦU MỚI (Income theo xu/phút)
 const CAT_TYPES = [
-    { name: 'Mèo Béo Phơi Nắng', rarity: 'Thường', rate: 25, emoji: '<:meobeophoinang:1551973509796724786>', image: 'https://i.pinimg.com/736x/09/04/14/0904144cabdfd4e01784bf064d56d290.jpg', incomePerSec: 0.02 },
-    { name: 'Mèo Mướp', rarity: 'Thường', rate: 20, emoji: '<:meomuop:1551973509796724786>', image: 'https://i.pinimg.com/736x/ce/04/8c/ce048c234c179b17841811151df5259c.jpg', incomePerSec: 0.02 },
-    { name: 'Mèo Anh Lông Dài', rarity: 'Thường', rate: 15, emoji: '<:meoanhlongdai:1551973751921451079>', image: 'https://i.pinimg.com/736x/ce/04/8c/ce048c234c179b17841811151df5259c.jpg', incomePerSec: 0.025 },
-    { name: 'Mèo Anh Lông Ngắn', rarity: 'Thường', rate: 15, emoji: '<:meoanhlongngan:1551973509796724786>', image: 'https://i.pinimg.com/736x/09/04/14/0904144cabdfd4e01784bf064d56d290.jpg', incomePerSec: 0.025 },
-    { name: 'Mèo Ragdoll', rarity: 'Hiếm', rate: 12, emoji: '<:meoragdoll:1551973858276409414>', image: 'https://i.pinimg.com/736x/39/d2/da/39d2dae2e2cabc21163699f6e3601916.jpg', incomePerSec: 0.06 },
-    { name: 'Mèo Tuxedo', rarity: 'Hiếm', rate: 12, emoji: '<:meotuxedo:1551973751921451079>', image: 'https://i.pinimg.com/1200x/9f/84/3d/9f843d43cc4078283dae7327e8ce7314.jpg', incomePerSec: 0.06 },
-    { name: 'Mèo Trà Xanh', rarity: 'Hiếm', rate: 10, emoji: '<:meotraxanh:1551974270505189426>', image: 'https://i.pinimg.com/736x/a2/06/ad/a206ad186aed59dff16bbce4bdff424b.jpg', incomePerSec: 0.07 },
-    { name: 'Mèo Maine Coon', rarity: 'Cực Hiếm', rate: 8, emoji: '<:meomarinecoon:1551974053542109204>', image: 'https://i.pinimg.com/736x/65/e6/e9/65e6e9bf4946447e0af173e6d340c908.jpg', incomePerSec: 0.15 },
-    { name: 'Mèo Lofi Nghe Nhạc', rarity: 'Cực Hiếm', rate: 8, emoji: '<:meolofi:1551974186455670865>', image: 'https://i.pinimg.com/736x/b3/12/89/b3128925bda713b4303f89b9c2d62744.jpg', incomePerSec: 0.15 },
-    { name: 'Mèo Hoàng Gia', rarity: 'Huyền Thoại', rate: 5, emoji: '<:meohoanggia:1551973577153314966>', image: 'https://i.pinimg.com/1200x/2b/05/9e/2b059e2fbcf5c9087bf1e8f1f2a17165.jpg', incomePerSec: 0.4 }
+    { name: 'Mèo Béo Phơi Nắng', rarity: 'Thường', rate: 25, emoji: '<:meobeophoinang:1551973509796724786>', image: 'https://i.pinimg.com/736x/09/04/14/0904144cabdfd4e01784bf064d56d290.jpg', incomePerMin: 1 },
+    { name: 'Mèo Mướp', rarity: 'Thường', rate: 20, emoji: '<:meomuop:1551973509796724786>', image: 'https://i.pinimg.com/736x/ce/04/8c/ce048c234c179b17841811151df5259c.jpg', incomePerMin: 1 },
+    { name: 'Mèo Anh Lông Dài', rarity: 'Thường', rate: 20, emoji: '<:meoanhlongdai:1551973751921451079>', image: 'https://i.pinimg.com/736x/ce/04/8c/ce048c234c179b17841811151df5259c.jpg', incomePerMin: 1 },
+    { name: 'Mèo Anh Lông Ngắn', rarity: 'Thường', rate: 20, emoji: '<:meoanhlongngan:1551973509796724786>', image: 'https://i.pinimg.com/736x/09/04/14/0904144cabdfd4e01784bf064d56d290.jpg', incomePerMin: 1 },
+    { name: 'Mèo Ragdoll', rarity: 'Hiếm', rate: 12, emoji: '<:meoragdoll:1551973858276409414>', image: 'https://i.pinimg.com/736x/39/d2/da/39d2dae2e2cabc21163699f6e3601916.jpg', incomePerMin: 5 },
+    { name: 'Mèo Tuxedo', rarity: 'Hiếm', rate: 10, emoji: '<:meotuxedo:1551973751921451079>', image: 'https://i.pinimg.com/1200x/9f/84/3d/9f843d43cc4078283dae7327e8ce7314.jpg', incomePerMin: 7 },
+    { name: 'Mèo Trà Xanh', rarity: 'Hiếm', rate: 10, emoji: '<:meotraxanh:1551974270505189426>', image: 'https://i.pinimg.com/736x/a2/06/ad/a206ad186aed59dff16bbce4bdff424b.jpg', incomePerMin: 7 },
+    { name: 'Mèo Maine Coon', rarity: 'Cực Hiếm', rate: 8, emoji: '<:meomarinecoon:1551974053542109204>', image: 'https://i.pinimg.com/736x/65/e6/e9/65e6e9bf4946447e0af173e6d340c908.jpg', incomePerMin: 10 },
+    { name: 'Mèo Lofi Nghe Nhạc', rarity: 'Cực Hiếm', rate: 7, emoji: '<:meolofi:1551974186455670865>', image: 'https://i.pinimg.com/736x/b3/12/89/b3128925bda713b4303f89b9c2d62744.jpg', incomePerMin: 12 },
+    { name: 'Mèo Hoàng Gia', rarity: 'Huyền Thoại', rate: 5, emoji: '<:meohoanggia:1551973577153314966>', image: 'https://i.pinimg.com/1200x/2b/05/9e/2b059e2fbcf5c9087bf1e8f1f2a17165.jpg', incomePerMin: 15 }
 ];
 
 const RECIPES = {
@@ -114,7 +116,7 @@ function getCatInfo(rawName) {
     };
 }
 
-// TÍNH NĂNG NHIỆM VỤ (QUESTS RESET MỖI 12 GIỜ)
+// TÍNH NĂNG NHIỆM VỤ
 function checkAndResetQuests(user) {
     const now = Date.now();
     const TWELVE_HOURS = 12 * 60 * 60 * 1000;
@@ -122,9 +124,9 @@ function checkAndResetQuests(user) {
     if (!user.questResetAt || now - user.questResetAt >= TWELVE_HOURS) {
         user.questResetAt = now;
         
-        const plantTarget = Math.floor(Math.random() * 6) + 5; // 5 - 10 cây
-        const catchTarget = Math.floor(Math.random() * 2) + 1; // 1 - 2 mèo
-        const brewTarget = Math.floor(Math.random() * 3) + 1;  // 1 - 3 ly nước
+        const plantTarget = Math.floor(Math.random() * 6) + 5; 
+        const catchTarget = Math.floor(Math.random() * 2) + 1; 
+        const brewTarget = Math.floor(Math.random() * 3) + 1;  
 
         user.quests = [
             { id: 'plant', desc: `Trồng ${plantTarget} cây bất kỳ`, target: plantTarget, progress: 0, reward: plantTarget * 20, claimed: false },
@@ -155,6 +157,7 @@ async function getUser(userId) {
         if (!user.inventory || typeof user.inventory !== 'object') user.inventory = {};
         if (!Array.isArray(user.cats)) user.cats = [];
         if (!Array.isArray(user.plots)) user.plots = [];
+        if (!user.lastActiveAt) user.lastActiveAt = Date.now();
         checkAndResetQuests(user);
         return user;
     } catch (e) {
@@ -176,11 +179,12 @@ client.once('ready', async () => {
     setInterval(spawnCatTask, 45 * 60 * 1000);
 });
 
-// HÀM XỬ LÝ SPAWN MÈO DÙNG CHUNG
+// HÀM XỬ LÝ SPAWN MÈO
 async function triggerCatSpawn(channel) {
     if (!channel) return false;
 
-    const rand = Math.floor(Math.random() * 100) + 1;
+    let totalRate = CAT_TYPES.reduce((acc, c) => acc + c.rate, 0);
+    const rand = Math.floor(Math.random() * totalRate) + 1;
     let cumulative = 0;
     let selectedCat = CAT_TYPES[0];
 
@@ -230,35 +234,29 @@ client.on('messageCreate', async (message) => {
 
         if (!content.startsWith(currentPrefix) && content.toLowerCase() !== 'cat' && content.toLowerCase() !== 'meo') return;
 
+        // Cập nhật thời gian hoạt động gần nhất của người chơi để xác định Online/Offline
+        const activeUser = await getUser(message.author.id);
+
         const args = content.startsWith(currentPrefix) ? content.slice(currentPrefix.length).trim().split(/ +/) : [content];
         const command = args.shift().toLowerCase();
 
         // Lệnh đổi Prefix riêng cho từng Guild
         if (command === 'setprefix') {
-            if (!message.guild) {
-                return message.reply('❌ Bạn chỉ có thể đổi prefix bên trong Server!');
-            }
-            if (!message.member?.permissions?.has('Administrator')) {
-                return message.reply('❌ Bạn cần quyền **Administrator** để thay đổi Prefix của Server này!');
-            }
+            if (!message.guild) return message.reply('❌ Bạn chỉ có thể đổi prefix bên trong Server!');
+            if (!message.member?.permissions?.has('Administrator')) return message.reply('❌ Bạn cần quyền **Administrator**!');
             const newPrefix = args[0];
-            if (!newPrefix) {
-                return message.reply(`❌ Cú pháp: \`${currentPrefix}setprefix <prefix_mới>\``);
-            }
+            if (!newPrefix) return message.reply(`❌ Cú pháp: \`${currentPrefix}setprefix <prefix_mới>\``);
+            
             await Config.findOneAndUpdate({ key: `prefix_${message.guild.id}` }, { value: newPrefix }, { upsert: true, new: true });
-            return message.channel.send(`⚙️ **Đã đổi Prefix thành công cho Server này!** Prefix mới: \`${newPrefix}\``);
+            return message.channel.send(`⚙️ **Đã đổi Prefix thành công!** Prefix mới: \`${newPrefix}\``);
         }
 
         // 🔒 LỆNH BÍ MẬT: SPAWN MÈO NGAY LẬP TỨC (!spawn 200412)
         if (command === 'spawn') {
             const password = args[0];
-            if (password !== '200412') {
-                return message.reply('❌ Mật mã xác nhận không chính xác!');
-            }
+            if (password !== '200412') return message.reply('❌ Mật mã xác nhận không chính xác!');
 
-            // Xóa tin nhắn lệnh của Admin để bảo mật cú pháp
             message.delete().catch(() => {});
-
             await triggerCatSpawn(message.channel);
             return;
         }
@@ -266,9 +264,7 @@ client.on('messageCreate', async (message) => {
         // Lệnh bí mật Reset All Data
         if (command === 'resetdata') {
             const password = args[0];
-            if (password !== '200412') {
-                return message.reply('❌ Mật mã xác nhận không chính xác!');
-            }
+            if (password !== '200412') return message.reply('❌ Mật mã xác nhận không chính xác!');
 
             await User.updateMany({}, {
                 $set: {
@@ -276,10 +272,11 @@ client.on('messageCreate', async (message) => {
                     cats: [],
                     inventory: { hatgiong_lua: 2, thucan: 2 },
                     plots: [],
-                    lastClaimCatCoins: Date.now()
+                    lastClaimCatCoins: Date.now(),
+                    lastActiveAt: Date.now()
                 }
             });
-            return message.channel.send('⚠️ **ĐÃ RESET TOÀN BỘ DỮ LIỆU CỦA TẤT CẢ NGƯỜI CHƠI TRÊN MỌI SERVER VỀ MẶC ĐỊNH!**');
+            return message.channel.send('⚠️ **ĐÃ RESET TOÀN BỘ DỮ LIỆU CỦA TẤT CẢ NGƯỜI CHƠI VỀ MẶC ĐỊNH!**');
         }
 
         // 📌 LỆNH HELP
@@ -287,40 +284,45 @@ client.on('messageCreate', async (message) => {
             const p = currentPrefix;
             const embed = new EmbedBuilder()
                 .setTitle('📜 HƯỚNG DẪN CÁCH CHƠI - MÈO & TRÀ 🍵')
-                .setDescription(`Dưới đây là toàn bộ danh sách lệnh bạn có thể sử dụng (Prefix server này: \`${p}\`):`)
+                .setDescription(`Dưới đây là danh sách lệnh (Prefix server: \`${p}\`):`)
                 .setColor(0xFFA500)
                 .addFields(
                     { 
                         name: '🎒 Cá Nhân & Bắt Mèo', 
-                        value: `• \`${p}tui\` (hoặc \`${p}t\`): Xem hành trang, ví tiền, nông trại & mèo đang có.\n• \`${p}quest\` (hoặc \`${p}q\`): Xem & nhận thưởng nhiệm vụ mỗi 12h.\n• \`${p}index\` (hoặc \`${p}zoo\`): Xem bộ sưu tập mèo đã thu thập được.\n• \`${p}cat\` / \`${p}meo\`: Bắt mèo lang thang khi nó xuất hiện.\n• \`${p}diemdanh\` (hoặc \`${p}dd\`): Uống trà sáng nhận ${COIN_EMOJI} xu miễn phí mỗi ngày.` 
+                        value: `• \`${p}tui\` (hoặc \`${p}t\`): Xem hành trang, ví tiền, nông trại & mèo.\n• \`${p}quest\` (hoặc \`${p}q\`): Xem & nhận thưởng nhiệm vụ mỗi 12h.\n• \`${p}index\` (hoặc \`${p}zoo\`): Bộ sưu tập mèo.\n• \`${p}cat\` / \`${p}meo\`: Bắt mèo lang thang.\n• \`${p}diemdanh\` (hoặc \`${p}dd\`): Điểm danh nhận ${COIN_EMOJI} xu mỗi ngày.` 
                     },
                     { 
                         name: '🌱 Nông Trại & Chăm Mèo', 
-                        value: `• \`${p}vuon\` (hoặc \`${p}v\`): Xem sơ đồ vườn cây dạng ô đất.\n• \`${p}trong <loại> [số_lượng]\`: Trồng cây (lua, tra, mia, caphe, tre).\n• \`${p}thuhoach\` (hoặc \`${p}th\`): Thu hoạch cây trồng đã chín.\n• \`${p}choan <STT>\`: Cho mèo ăn tăng XP (STT lấy từ lệnh \`${p}tui\`).\n• \`${p}kiemtien\` (hoặc \`${p}kt\`): Thu gom tiền tích lũy từ đàn mèo.` 
+                        value: `• \`${p}vuon\` (hoặc \`${p}v\`): Xem sơ đồ vườn cây.\n• \`${p}trong <loại> [số_lượng]\`: Trồng cây.\n• \`${p}thuhoach\` (hoặc \`${p}th\`): Thu hoạch cây chín.\n• \`${p}choan <STT>\`: Cho mèo ăn tăng XP.\n• \`${p}kiemtien\` (hoặc \`${p}kt\`): Thu tiền tích lũy từ đàn mèo (Offline bị giảm 1/2 tiền).` 
                     },
                     { 
                         name: '🏪 Cửa Hàng & Chế Đồ', 
-                        value: `• \`${p}shop\` (hoặc \`${p}s\`): Xem danh sách hạt giống và thức ăn.\n• \`${p}mua <tên_món> [số_lượng]\`: Mua hạt giống hoặc thức ăn.\n• \`${p}ban <tên_món> [số_lượng]\`: Bán nông sản/nước uống kiếm ${COIN_EMOJI} xu.\n• \`${p}phache <tên_món>\`: Pha chế đồ uống (tradao, caphesua, nuocmia).` 
+                        value: `• \`${p}shop\` (hoặc \`${p}s\`): Cửa hàng hạt giống & thức ăn.\n• \`${p}mua <tên_món> [số_lượng]\`: Mua vật phẩm.\n• \`${p}ban <tên_món> [số_lượng]\`: Bán nông sản/nước uống.\n• \`${p}phache <tên_món>\`: Pha chế đồ uống.` 
                     },
                     { 
                         name: '⚙️ Quản Trị Viên (Admin Only)', 
-                        value: `• \`${p}setprefix <prefix_mới>\`: Thay đổi prefix riêng cho server này.\n• \`${p}setchannel\`: Cài đặt kênh này làm nơi mèo xuất hiện.` 
+                        value: `• \`${p}setprefix <prefix_mới>\`: Thay đổi prefix server.\n• \`${p}setchannel\`: Cài đặt kênh spawn mèo.` 
                     }
                 )
                 .setImage('https://64.media.tumblr.com/b7fe4e7380ad5ead6b5b923dda4a57be/0a55b5030b869431-19/s1280x1920/67ca2429b7d137a9b7b808e8d820ef4a8be79255.gif')
                 .setFooter({ text: 'Chúc bạn chơi game vui vẻ!' });
+
+            if (activeUser) {
+                activeUser.lastActiveAt = Date.now();
+                await activeUser.save();
+            }
 
             return message.channel.send({ embeds: [embed] });
         }
 
         // LỆNH NHIỆM VỤ (!quest / !q / !nhiemvu)
         if (command === 'quest' || command === 'q' || command === 'nhiemvu') {
-            const user = await getUser(message.author.id);
+            const user = activeUser;
             if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
 
+            user.lastActiveAt = Date.now();
             const subCmd = args[0]?.toLowerCase();
 
-            // Nhận thưởng nhiệm vụ: !quest nhan <STT / all>
             if (subCmd === 'nhan' || subCmd === 'claim') {
                 const target = args[1]?.toLowerCase();
                 let totalReward = 0;
@@ -341,21 +343,15 @@ client.on('messageCreate', async (message) => {
                     }
 
                     const q = user.quests[idx];
-                    if (q.claimed) {
-                        return message.reply('❌ Bạn đã nhận thưởng nhiệm vụ này rồi!');
-                    }
-                    if (q.progress < q.target) {
-                        return message.reply('❌ Nhiệm vụ này chưa hoàn thành!');
-                    }
+                    if (q.claimed) return message.reply('❌ Bạn đã nhận thưởng nhiệm vụ này rồi!');
+                    if (q.progress < q.target) return message.reply('❌ Nhiệm vụ này chưa hoàn thành!');
 
                     q.claimed = true;
                     totalReward += q.reward;
                     claimedCount++;
                 }
 
-                if (claimedCount === 0) {
-                    return message.reply('❌ Không có nhiệm vụ nào đủ điều kiện nhận thưởng!');
-                }
+                if (claimedCount === 0) return message.reply('❌ Không có nhiệm vụ nào đủ điều kiện nhận!');
 
                 user.coins += totalReward;
                 user.markModified('quests');
@@ -364,7 +360,6 @@ client.on('messageCreate', async (message) => {
                 return message.reply(`🎉 Bạn đã nhận thành công **${totalReward}**${COIN_EMOJI} từ nhiệm vụ!`);
             }
 
-            // Hiển thị danh sách Nhiệm vụ
             const now = Date.now();
             const TWELVE_HOURS = 12 * 60 * 60 * 1000;
             const timeLeftMs = Math.max(0, TWELVE_HOURS - (now - user.questResetAt));
@@ -374,24 +369,26 @@ client.on('messageCreate', async (message) => {
             let questListText = '';
             user.quests.forEach((q, i) => {
                 const isDone = q.progress >= q.target;
-                const statusIcon = q.claimed ? '✅ (Đã nhận)' : (isDone ? '✨ (Hoàn thành - Sẵn sàng nhận)' : '⏳ (Đang làm)');
+                const statusIcon = q.claimed ? '✅ (Đã nhận)' : (isDone ? '✨ (Hoàn thành)' : '⏳ (Đang làm)');
                 questListText += `**${i + 1}.${q.desc}**\n• Tiến độ: \`${q.progress}/${q.target}\` - Trạng thái: ${statusIcon}\n• Phần thưởng: **${q.reward}**${COIN_EMOJI}\n\n`;
             });
 
             const embed = new EmbedBuilder()
-                .setTitle(`📜 NHIỆM VỤ HÀNG NGÀY (Của ${message.author.username})`)
+                .setTitle(`📜 NHIỆM VỤ HÀNG NGÀY (${message.author.username})`)
                 .setDescription(questListText)
-                .setFooter({ text: `Nhiệm vụ làm mới sau: ${hoursLeft}h ${minutesLeft}m \vert{} Gõ ${currentPrefix}quest nhan <STT/all> để nhận` })
+                .setFooter({ text: `Nhiệm vụ làm mới sau: ${hoursLeft}h${minutesLeft}m` })
                 .setColor(0x3498DB);
 
+            await user.save();
             return message.channel.send({ embeds: [embed] });
         }
 
         // LỆNH XEM VƯỜN ĐẤT TRỒNG (!vuon hoặc !v)
         if (command === 'vuon' || command === 'v') {
-            const user = await getUser(message.author.id);
+            const user = activeUser;
             if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
 
+            user.lastActiveAt = Date.now();
             const now = Date.now();
             let plotEmojis = [];
             let detailList = [];
@@ -403,11 +400,11 @@ client.on('messageCreate', async (message) => {
 
                     if (now >= plot.harvestAt) {
                         plotEmojis.push('✨');
-                        detailList.push(`• Ô ${i + 1}: **${plantInfo.name}** (✨ Đã chín - sẵn sàng thu hoạch)`);
+                        detailList.push(`• Ô ${i + 1}: **${plantInfo.name}** (✨ Đã chín)`);
                     } else {
                         plotEmojis.push('🪻');
                         const timeLeftSec = Math.ceil((plot.harvestAt - now) / 1000);
-                        detailList.push(`• Ô ${i + 1}: **${plantInfo.name}** (🪻 Đang lớn - còn ${timeLeftSec}s)`);
+                        detailList.push(`• Ô ${i + 1}: **${plantInfo.name}** (🪻 Còn ${timeLeftSec}s)`);
                     }
                 } else {
                     plotEmojis.push('🟫');
@@ -420,11 +417,11 @@ client.on('messageCreate', async (message) => {
 
             const embed = new EmbedBuilder()
                 .setTitle(`🌾 Nông Trại Của ${message.author.username}`)
-                .setDescription(`### **Sơ đồ mảnh đất:**\n${gardenGrid}\n\n### **Chi tiết ô đất:**\n${detailList.length > 0 ? detailList.join('\n') : 'Chưa trồng cây nào (Đất đang trống).'}`)
+                .setDescription(`### **Sơ đồ mảnh đất:**\n${gardenGrid}\n\n### **Chi tiết ô đất:**\n${detailList.length > 0 ? detailList.join('\n') : 'Đất đang trống.'}`)
                 .setImage('https://i.pinimg.com/originals/7b/1b/b6/7b1bb67b642f2665a0709a26e57300e1.gif')
-                .setFooter({ text: `Dùng ${currentPrefix}trong <loại> để trồng \vert{} ${currentPrefix}thuhoach để thu hoạch` })
                 .setColor(0x8B4513);
 
+            await user.save();
             return message.channel.send({ embeds: [embed] });
         }
 
@@ -433,9 +430,10 @@ client.on('messageCreate', async (message) => {
             if (currentWildCat) {
                 const catCaught = currentWildCat;
                 currentWildCat = null;
-                const user = await getUser(message.author.id);
+                const user = activeUser;
                 if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
 
+                user.lastActiveAt = Date.now();
                 user.cats.push({ name: catCaught.name, rarity: catCaught.rarity, level: 1, xp: 0 });
                 updateQuestProgress(user, 'catch', 1);
                 user.markModified('cats');
@@ -457,9 +455,10 @@ client.on('messageCreate', async (message) => {
 
         // INDEX MÈO
         if (command === 'index' || command === 'zoo') {
-            const user = await getUser(message.author.id);
+            const user = activeUser;
             if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
 
+            user.lastActiveAt = Date.now();
             const catCounts = {};
             user.cats.forEach(c => {
                 const clean = cleanCatName(c.name);
@@ -496,14 +495,16 @@ client.on('messageCreate', async (message) => {
                 .setFooter({ text: `Tiến độ thu thập: ${totalOwnedUnique}/${totalCatsInGame} chú mèo khác nhau` })
                 .setColor(0xFFB6C1);
 
+            await user.save();
             return message.channel.send({ embeds: [embed] });
         }
 
         // TÚI ĐỒ
         if (command === 'tui' || command === 't') {
-            const user = await getUser(message.author.id);
+            const user = activeUser;
             if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
 
+            user.lastActiveAt = Date.now();
             let catList = 'Chưa có con mèo nào.';
             if (user.cats.length > 0) {
                 const groupedCats = {};
@@ -548,22 +549,27 @@ client.on('messageCreate', async (message) => {
                 .setColor(0xD2B48C)
                 .addFields(
                     { name: '💰 Ví tiền', value: `${user.coins}${COIN_EMOJI}` },
-                    { name: '🌱 Đất trồng', value: `Tổng: **${user.plots.length}/${user.maxPlots}** ô (Chín: ${readyPlots}, Đang lớn: ${growingPlots})\n👉 Gõ \`${currentPrefix}vuon\` để xem sơ đồ đất` },
+                    { name: '🌱 Đất trồng', value: `Tổng: **${user.plots.length}/${user.maxPlots}** ô (Chín: ${readyPlots}, Đang lớn: ${growingPlots})` },
                     { name: '📦 Vật phẩm', value: invText },
                     { name: '🐾 Ổ Mèo', value: catList }
                 );
 
+            await user.save();
             return message.channel.send({ embeds: [embed] });
         }
 
         // SHOP
         if (command === 'shop' || command === 's') {
-            const user = await getUser(message.author.id);
+            const user = activeUser;
             const userCoins = user ? user.coins : 0;
+            if (user) {
+                user.lastActiveAt = Date.now();
+                await user.save();
+            }
 
             const embed = new EmbedBuilder()
                 .setTitle('🏪 Tiệm Tạp Hóa Cây & Mèo')
-                .setDescription(`💰 **Số tiền hiện có của bạn:** \`${userCoins}\` ${COIN_EMOJI}\n\nDùng lệnh \`${currentPrefix}mua <tên_món> [số_lượng]\` để mua:`)
+                .setDescription(`💰 **Số tiền hiện có:** \`${userCoins}\` ${COIN_EMOJI}\n\nDùng lệnh \`${currentPrefix}mua <tên_món> [số_lượng]\` để mua:`)
                 .setColor(0x98FB98)
                 .setImage('https://i.pinimg.com/originals/3a/a4/6f/3aa46f5701fc6ed92234ea0a9f86e2cd.gif')
                 .addFields(
@@ -576,9 +582,10 @@ client.on('messageCreate', async (message) => {
 
         // MUA ĐỒ
         if (command === 'mua') {
-            const user = await getUser(message.author.id);
+            const user = activeUser;
             if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
 
+            user.lastActiveAt = Date.now();
             const item = args[0]?.toLowerCase();
             const quantity = parseInt(args[1]) || 1;
 
@@ -601,18 +608,41 @@ client.on('messageCreate', async (message) => {
             return message.reply(`🛒 Bạn đã mua thành công **${quantity}x${item}** với giá **${total}**${COIN_EMOJI}!`);
         }
 
-        // RÚT TIỀN TỪ MÈO
+        // 💰 RÚT TIỀN TỪ MÈO (TÍNH NĂNG ONLINE/OFFLINE MỚI)
         if (command === 'kiemtien' || command === 'kt') {
-            const user = await getUser(message.author.id);
+            const user = activeUser;
             if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
 
             if (user.cats.length === 0) return message.reply('😿 Bạn chưa có mèo trong chuồng!');
 
             const now = Date.now();
-            const timePassedSec = Math.floor((now - user.lastClaimCatCoins) / 1000);
+            const lastClaim = user.lastClaimCatCoins || now;
+            const lastActive = user.lastActiveAt || now;
 
-            if (timePassedSec < 10) return message.reply('⏰ Đàn mèo chưa tích lũy đủ xu, quay lại sau ít giây nữa!');
+            // Ngưỡng coi người chơi bắt đầu Offline: 5 phút không hoạt động
+            const OFFLINE_THRESHOLD_MS = 5 * 60 * 1000;
+            const offlineStartTime = lastActive + OFFLINE_THRESHOLD_MS;
 
+            let onlineTimeSec = 0;
+            let offlineTimeSec = 0;
+
+            if (now <= offlineStartTime) {
+                // Toàn bộ thời gian tích lũy là Online
+                onlineTimeSec = (now - lastClaim) / 1000;
+            } else if (lastClaim >= offlineStartTime) {
+                // Toàn bộ thời gian tích lũy là Offline
+                offlineTimeSec = (now - lastClaim) / 1000;
+            } else {
+                // Tích lũy gồm cả khoảng Online và Offline
+                onlineTimeSec = (offlineStartTime - lastClaim) / 1000;
+                offlineTimeSec = (now - offlineStartTime) / 1000;
+            }
+
+            if ((onlineTimeSec + offlineTimeSec) < 10) {
+                return message.reply('⏰ Đàn mèo chưa tích lũy đủ xu, quay lại sau ít giây nữa!');
+            }
+
+            // Tính tổng tốc độ kiếm xu chuẩn theo từng loại mèo (công thức mới: Xu/phút và 1.25x / level)
             let totalIncomePerSec = 0;
 
             user.cats.forEach(c => {
@@ -620,27 +650,38 @@ client.on('messageCreate', async (message) => {
                 const catDef = CAT_TYPES.find(ct => info.cleanName.toLowerCase().includes(ct.name.toLowerCase()) || ct.name.toLowerCase().includes(info.cleanName.toLowerCase())) || CAT_TYPES[0];
                 const catLvl = Math.min(MAX_CAT_LEVEL, c.level || 1);
                 
-                const baseIncome = catDef.incomePerSec;
-                const levelBonus = 1 + ((catLvl - 1) * 0.1);
-                totalIncomePerSec += (baseIncome * levelBonus);
+                // Thu nhập gốc mỗi giây = incomePerMin / 60
+                const baseIncomePerSec = catDef.incomePerMin / 60;
+                
+                // Nhân 1.25x cho mỗi cấp vượt qua cấp 1
+                const levelMultiplier = Math.pow(1.25, catLvl - 1);
+                
+                totalIncomePerSec += (baseIncomePerSec * levelMultiplier);
             });
 
-            const totalEarned = Math.floor(timePassedSec * totalIncomePerSec);
+            // Tiền Online hưởng 100%, Tiền Offline bị giảm 1/2 (50%)
+            const onlineEarned = onlineTimeSec * totalIncomePerSec;
+            const offlineEarned = (offlineTimeSec * totalIncomePerSec) * 0.5;
+
+            const totalEarned = Math.floor(onlineEarned + offlineEarned);
 
             if (totalEarned <= 0) return message.reply(`🐾 Đàn mèo chưa tích lũy đủ ${COIN_EMOJI}!`);
 
             user.coins += totalEarned;
             user.lastClaimCatCoins = now;
+            user.lastActiveAt = now; // Reset lại trạng thái Online
             await user.save();
 
-            return message.reply(`🐾 Đàn mèo đã chăm chỉ tích lũy! Bạn rút được **${totalEarned}**${COIN_EMOJI} trong chuồng!`);
+            let offlineNote = offlineTimeSec > 0 ? ` *(Đã giảm 1/2 xu trong khoảng thời gian Offline)*` : '';
+            return message.reply(`🐾 Đàn mèo đã chăm chỉ tích lũy! Bạn rút được **${totalEarned}** ${COIN_EMOJI}!${offlineNote}`);
         }
 
         // CHO MÈO ĂN
         if (command === 'choan') {
-            const user = await getUser(message.author.id);
+            const user = activeUser;
             if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
 
+            user.lastActiveAt = Date.now();
             if (user.cats.length === 0) return message.reply('😿 Bạn chưa có mèo!');
 
             const foodCount = user.inventory.thucan || 0;
@@ -690,9 +731,10 @@ client.on('messageCreate', async (message) => {
 
         // TRỒNG CÂY
         if (command === 'trong' || command === 'tr') {
-            const user = await getUser(message.author.id);
+            const user = activeUser;
             if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
 
+            user.lastActiveAt = Date.now();
             const plantKey = args[0]?.toLowerCase();
             const count = parseInt(args[1]) || 1;
 
@@ -718,14 +760,15 @@ client.on('messageCreate', async (message) => {
             user.markModified('plots');
             await user.save();
 
-            return message.reply(`🌱 Đã trồng thành công **${count}x${plant.name}**! Gõ \`${currentPrefix}vuon\` để xem tiến độ hoặc \`${currentPrefix}thuhoach\` khi cây chín.`);
+            return message.reply(`🌱 Đã trồng thành công **${count}x${plant.name}**! Gõ \`${currentPrefix}vuon\` để xem tiến độ.`);
         }
 
         // THU HOẠCH
         if (command === 'thuhoach' || command === 'th') {
-            const user = await getUser(message.author.id);
+            const user = activeUser;
             if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
 
+            user.lastActiveAt = Date.now();
             if (user.plots.length === 0) return message.reply('🌱 Bạn chưa trồng cây nào!');
 
             const now = Date.now();
@@ -756,9 +799,10 @@ client.on('messageCreate', async (message) => {
 
         // BÁN NÔNG SẢN
         if (command === 'ban' || command === 'b') {
-            const user = await getUser(message.author.id);
+            const user = activeUser;
             if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
 
+            user.lastActiveAt = Date.now();
             const item = args[0]?.toLowerCase();
             const quantity = parseInt(args[1]) || 1;
 
@@ -786,9 +830,10 @@ client.on('messageCreate', async (message) => {
 
         // PHA CHẾ
         if (command === 'phache' || command === 'pha') {
-            const user = await getUser(message.author.id);
+            const user = activeUser;
             if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
 
+            user.lastActiveAt = Date.now();
             const drinkKey = args[0]?.toLowerCase();
             if (!RECIPES[drinkKey]) return message.reply('❌ Món uống không hợp lệ! Gồm: `tradao`, `caphesua`, `nuocmia`');
 
@@ -815,9 +860,10 @@ client.on('messageCreate', async (message) => {
 
         // ĐIỂM DANH
         if (command === 'diemdanh' || command === 'dd') {
-            const user = await getUser(message.author.id);
+            const user = activeUser;
             if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
 
+            user.lastActiveAt = Date.now();
             const now = Date.now();
             const cooldown = 24 * 60 * 60 * 1000;
 
