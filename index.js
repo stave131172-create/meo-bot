@@ -19,6 +19,7 @@ const userSchema = new mongoose.Schema({
     userId: { type: String, required: true, unique: true },
     coins: { type: Number, default: 20 },
     cats: { type: Array, default: [] },
+    selectedCats: { type: Array, default: [] }, // Danh sách các chỉ số (index) mèo được chọn (Tối đa 3)
     inventory: { type: Object, default: { hatgiong_lua: 2, thucan: 2 } },
     plots: { type: Array, default: [] },
     maxPlots: { type: Number, default: 5 },
@@ -39,13 +40,112 @@ const configSchema = new mongoose.Schema({
 const User = mongoose.model('User', userSchema);
 const Config = mongoose.model('Config', configSchema);
 
-// DỮ LIỆU CÂY TRỒNG
+// DỮ LIỆU CÂY TRỒNG MỚI & CƠ CHẾ GIAI ĐOẠN
 const PLANTS = {
-    lua: { name: 'Lúa', seedItem: 'hatgiong_lua', cropItem: 'lua', cropName: 'Lúa', seedPrice: 10, cropPrice: 18, timeMs: 20000 },
-    tra: { name: 'Cây Trà', seedItem: 'hatgiong_tra', cropItem: 'la_tra', cropName: 'Lá Trà', seedPrice: 30, cropPrice: 55, timeMs: 40000 },
-    mia: { name: 'Cây Mía', seedItem: 'hatgiong_mia', cropItem: 'cay_mia', cropName: 'Cây Mía', seedPrice: 55, cropPrice: 100, timeMs: 60000 },
-    caphe: { name: 'Cây Cà Phê', seedItem: 'hatgiong_caphe', cropItem: 'hat_caphe', cropName: 'Hạt Cà Phê', seedPrice: 100, cropPrice: 180, timeMs: 90000 },
-    tre: { name: 'Cây Tre', seedItem: 'hatgiong_tre', cropItem: 'than_tre', cropName: 'Thân Tre', seedPrice: 200, cropPrice: 360, timeMs: 120000 }
+    lua: {
+        name: 'Lúa',
+        seedItem: 'hatgiong_lua',
+        cropItem: 'lua',
+        cropName: 'Lúa',
+        seedPrice: 10,
+        cropPrice: 18,
+        permanent: false,
+        seedEmoji: '🌾',
+        cropEmoji: '🌾',
+        stages: [
+            { durationMs: 10000, emoji: '🌱' },
+            { durationMs: 10000, emoji: '✨' }
+        ]
+    },
+    carot: {
+        name: 'Cà Rốt',
+        seedItem: 'hatgiong_carot',
+        cropItem: 'carot',
+        cropName: 'Cà Rốt',
+        seedPrice: 15,
+        cropPrice: 35,
+        permanent: false,
+        seedEmoji: '<:Carrot_Seeds:1553398816785309879>',
+        cropEmoji: '<:Carrot:1553399221200363520>',
+        stages: [
+            { durationMs: 30000, emoji: '<:Carrot_Stage_1:1553398949082042428>' },
+            { durationMs: 30000, emoji: '<:Carrot_Stage_2:1553398991838904341>' },
+            { durationMs: 0, emoji: '<:Carrot_Stage_3:1553399066392666163>' }
+        ]
+    },
+    caphe: {
+        name: 'Cây Cà Phê',
+        seedItem: 'hatgiong_caphe',
+        cropItem: 'hat_caphe',
+        cropName: 'Hạt Cà Phê',
+        seedPrice: 100,
+        cropPrice: 180,
+        permanent: true,
+        regrowStage: 3, // Sau khi hái lùi về giai đoạn 4 (index 3)
+        seedEmoji: '<:coffe_seed:1553711053731405976>',
+        cropEmoji: '<:Coffee_Bean:1553399563430404269>',
+        stages: [
+            { durationMs: 120000, emoji: '<:Coffee_Stage_1:1553399628638978059>' }, // 2'
+            { durationMs: 120000, emoji: '<:Coffee_Stage_2:1553399691213807617>' }, // 2'
+            { durationMs: 120000, emoji: '<:Coffee_Stage_2:1553399691213807617>' }, // 2'
+            { durationMs: 240000, emoji: '<:Coffee_Stage_5:1553399880871972964>' }, // 4'
+            { durationMs: 0, emoji: '<:Coffee_Stage_5:1553399880871972964>' }      // Khi ra quả
+        ]
+    },
+    tra: {
+        name: 'Cây Trà',
+        seedItem: 'hatgiong_tra',
+        cropItem: 'la_tra',
+        cropName: 'Lá Trà',
+        seedPrice: 30,
+        cropPrice: 55,
+        permanent: true,
+        regrowStage: 1, // Sau khi hái lùi về giai đoạn 2 (index 1)
+        seedEmoji: '<:Tea_Sapling:1553704361597870190>',
+        cropEmoji: '<:Tea_Leaves:1553704316643057816>',
+        stages: [
+            { durationMs: 240000, emoji: '<:Tea_Stage_1:1553704420934680670>' }, // 4'
+            { durationMs: 240000, emoji: '<:Tea_Stage_2:1553704487636705360>' }, // 4'
+            { durationMs: 0, emoji: '<:Tea_Stage_4:1553712192619159592>' }       // Khi ra quả
+        ]
+    },
+    ot: {
+        name: 'Cây Ớt',
+        seedItem: 'hatgiong_ot',
+        cropItem: 'trai_ot',
+        cropName: 'Trái Ớt',
+        seedPrice: 50,
+        cropPrice: 110,
+        permanent: true,
+        regrowStage: 3, // Sau khi hái lùi về giai đoạn 4 (index 3)
+        seedEmoji: '<:Pepper_Seeds:1553712338635591690>',
+        cropEmoji: '<:Hot_Pepper:1553707775262195712>',
+        stages: [
+            { durationMs: 120000, emoji: '<:Hot_Pepper_Stage_1:1553707865808572587>' }, // 2'
+            { durationMs: 120000, emoji: '<:Hot_Pepper_Stage_2:1553707944430936155>' }, // 2'
+            { durationMs: 120000, emoji: '<:Hot_Pepper_Stage_3:1553708039348031620>' }, // 2'
+            { durationMs: 240000, emoji: '<:Hot_Pepper_Stage_4:1553708412901138503>' }, // 4'
+            { durationMs: 0, emoji: '<:Hot_Pepper_Stage_5:1553708105722892298>' }      // Khi ra quả
+        ]
+    },
+    suplo: {
+        name: 'Súp Lơ',
+        seedItem: 'hatgiong_suplo',
+        cropItem: 'suplo',
+        cropName: 'Súp Lơ',
+        seedPrice: 200,
+        cropPrice: 420,
+        permanent: false,
+        seedEmoji: '🌱',
+        cropEmoji: '<:Cauliflower_item:1553701544547844117>',
+        stages: [
+            { durationMs: 60000, emoji: '<:Cauliflower_Stage_1:1553701171363975178>' },  // 1'
+            { durationMs: 60000, emoji: '<:Cauliflower_Stage_2:1553701217014653100>' },  // 1'
+            { durationMs: 120000, emoji: '<:Cauliflower_Stage_3:1553701273415712838>' }, // 2'
+            { durationMs: 180000, emoji: '<:Cauliflower_Stage_4:1553701323671605319>' }, // 3'
+            { durationMs: 0, emoji: '<:Cauliflower_Stage_5:1553701425090007213>' }       // Có thể hái
+        ]
+    }
 };
 
 const RARITY_CONFIG = {
@@ -116,6 +216,40 @@ function getCatInfo(rawName) {
     };
 }
 
+// HÀM TÍNH GIAI ĐOẠN CỦA CÂY DỰA TRÊN THỜI GIAN
+function getPlantStatus(plot, now = Date.now()) {
+    const plantDef = PLANTS[plot.plantKey];
+    if (!plantDef) return { emoji: '❓', ready: false, text: 'Không rõ', stageIndex: 0 };
+
+    let elapsed = now - plot.plantedAt;
+    let accumulatedTime = 0;
+    let stageIndex = plot.stageIndex || 0;
+
+    for (let i = stageIndex; i < plantDef.stages.length - 1; i++) {
+        const stage = plantDef.stages[i];
+        if (elapsed >= stage.durationMs) {
+            elapsed -= stage.durationMs;
+            stageIndex = i + 1;
+        } else {
+            const remainingSec = Math.ceil((stage.durationMs - elapsed) / 1000);
+            return {
+                emoji: stage.emoji,
+                ready: false,
+                text: `Cần ${remainingSec}s nữa`,
+                stageIndex: i
+            };
+        }
+    }
+
+    const maxStageIndex = plantDef.stages.length - 1;
+    return {
+        emoji: plantDef.stages[maxStageIndex].emoji,
+        ready: true,
+        text: '✨ Đã chín (Có thể hái)',
+        stageIndex: maxStageIndex
+    };
+}
+
 // TÍNH NĂNG NHIỆM VỤ
 function checkAndResetQuests(user) {
     const now = Date.now();
@@ -156,6 +290,7 @@ async function getUser(userId) {
         }
         if (!user.inventory || typeof user.inventory !== 'object') user.inventory = {};
         if (!Array.isArray(user.cats)) user.cats = [];
+        if (!Array.isArray(user.selectedCats)) user.selectedCats = [];
         if (!Array.isArray(user.plots)) user.plots = [];
         if (!user.lastActiveAt) user.lastActiveAt = Date.now();
         checkAndResetQuests(user);
@@ -270,6 +405,7 @@ client.on('messageCreate', async (message) => {
                 $set: {
                     coins: 20,
                     cats: [],
+                    selectedCats: [],
                     inventory: { hatgiong_lua: 2, thucan: 2 },
                     plots: [],
                     lastClaimCatCoins: Date.now(),
@@ -289,11 +425,11 @@ client.on('messageCreate', async (message) => {
                 .addFields(
                     { 
                         name: '🎒 Cá Nhân & Bắt Mèo', 
-                        value: `• \`${p}tui\` (hoặc \`${p}t\`): Xem hành trang, ví tiền, nông trại & mèo.\n• \`${p}quest\` (hoặc \`${p}q\`): Xem & nhận thưởng nhiệm vụ mỗi 12h.\n• \`${p}index\` (hoặc \`${p}zoo\`): Bộ sưu tập mèo.\n• \`${p}cat\` / \`${p}meo\`: Bắt mèo lang thang.\n• \`${p}diemdanh\` (hoặc \`${p}dd\`): Điểm danh nhận ${COIN_EMOJI} xu mỗi ngày.` 
+                        value: `• \`${p}tui\` (hoặc \`${p}t\`): Xem hành trang, ví tiền, nông trại & mèo.\n• \`${p}select <STT1> <STT2> <STT3>\` (hoặc \`${p}chon\`): Chọn 3 mèo ra trận tính xu (khi có từ 4 loài trở lên).\n• \`${p}quest\` (hoặc \`${p}q\`): Xem & nhận thưởng nhiệm vụ mỗi 12h.\n• \`${p}index\` (hoặc \`${p}zoo\`): Bộ sưu tập mèo.\n• \`${p}cat\` / \`${p}meo\`: Bắt mèo lang thang.\n• \`${p}diemdanh\` (hoặc \`${p}dd\`): Điểm danh nhận ${COIN_EMOJI} xu mỗi ngày.` 
                     },
                     { 
                         name: '🌱 Nông Trại & Chăm Mèo', 
-                        value: `• \`${p}vuon\` (hoặc \`${p}v\`): Xem sơ đồ vườn cây.\n• \`${p}trong <loại> [số_lượng]\`: Trồng cây.\n• \`${p}thuhoach\` (hoặc \`${p}th\`): Thu hoạch cây chín.\n• \`${p}choan <STT>\`: Cho mèo ăn tăng XP.\n• \`${p}kiemtien\` (hoặc \`${p}kt\`): Thu tiền tích lũy từ đàn mèo (Offline bị giảm 1/2 tiền).` 
+                        value: `• \`${p}vuon\` (hoặc \`${p}v\`): Xem sơ đồ vườn cây.\n• \`${p}trong <loại> [số_lượng]\`: Trồng cây.\n• \`${p}thuhoach\` (hoặc \`${p}th\`): Thu hoạch cây chín.\n• \`${p}huy <ô_đất>\` (hoặc \`${p}nhocay\`): Nhổ cây vĩnh viễn.\n• \`${p}choan <STT>\`: Cho mèo ăn tăng XP.\n• \`${p}kiemtien\` (hoặc \`${p}kt\`): Thu tiền tích lũy từ đàn mèo (Offline bị giảm 1/2 tiền).` 
                     },
                     { 
                         name: '🏪 Cửa Hàng & Chế Đồ', 
@@ -398,14 +534,15 @@ client.on('messageCreate', async (message) => {
                     const plot = user.plots[i];
                     const plantInfo = PLANTS[plot.plantKey];
 
-                    if (now >= plot.harvestAt) {
-                        plotEmojis.push('✨');
-                        detailList.push(`• Ô ${i + 1}: **${plantInfo.name}** (✨ Đã chín)`);
-                    } else {
-                        plotEmojis.push('🪻');
-                        const timeLeftSec = Math.ceil((plot.harvestAt - now) / 1000);
-                        detailList.push(`• Ô ${i + 1}: **${plantInfo.name}** (🪻 Còn ${timeLeftSec}s)`);
+                    if (!plantInfo) {
+                        plotEmojis.push('🟫');
+                        continue;
                     }
+
+                    const status = getPlantStatus(plot, now);
+                    plotEmojis.push(status.emoji);
+                    const permTag = plantInfo.permanent ? ' *(Cây vĩnh viễn)*' : '';
+                    detailList.push(`• Ô ${i + 1}: **${plantInfo.name}** (${status.text})${permTag}`);
                 } else {
                     plotEmojis.push('🟫');
                 }
@@ -499,40 +636,80 @@ client.on('messageCreate', async (message) => {
             return message.channel.send({ embeds: [embed] });
         }
 
-        // TÚI ĐỒ
+        // SỬA ĐỔI 2: LỆNH CHỌN MÈO (!select / !chon)
+        if (command === 'select' || command === 'chon') {
+            const user = activeUser;
+            if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
+
+            user.lastActiveAt = Date.now();
+
+            if (user.cats.length === 0) return message.reply('😿 Bạn chưa có mèo nào!');
+
+            const uniqueSpecies = new Set(user.cats.map(c => cleanCatName(c.name)));
+            if (uniqueSpecies.size < 4) {
+                return message.reply(`ℹ️ Bạn hiện có **${uniqueSpecies.size} loài mèo khác nhau**. Tính năng chọn mèo chỉ áp dụng khi bạn sở hữu **từ 4 loài mèo khác nhau trở lên**! Khi dưới 4 loài, bot sẽ tự động lấy tiền từ tất cả các loài mèo.`);
+            }
+
+            const idx1 = parseInt(args[0]) - 1;
+            const idx2 = parseInt(args[1]) - 1;
+            const idx3 = parseInt(args[2]) - 1;
+
+            if (isNaN(idx1) || isNaN(idx2) || isNaN(idx3)) {
+                return message.reply(`❌ Cú pháp: \`${currentPrefix}select <STT1> <STT2> <STT3>\` (VD: \`${currentPrefix}select 1 2 3\`)\nXem STT bằng lệnh \`${currentPrefix}tui\`.`);
+            }
+
+            const indices = [idx1, idx2, idx3];
+            const uniqueIndices = new Set(indices);
+
+            if (uniqueIndices.size < 3) {
+                return message.reply('❌ Bạn không thể chọn trùng một chú mèo!');
+            }
+
+            for (const idx of indices) {
+                if (idx < 0 || idx >= user.cats.length) {
+                    return message.reply(`❌ Mèo ở vị trí **#${idx + 1}** không tồn tại! Hãy kiểm tra lại danh sách trong \`${currentPrefix}tui\`.`);
+                }
+            }
+
+            user.selectedCats = indices;
+            user.markModified('selectedCats');
+            await user.save();
+
+            const selectedNames = indices.map(i => {
+                const info = getCatInfo(user.cats[i].name);
+                return `${info.emoji} **${info.cleanName}** (Lv.${user.cats[i].level || 1})`;
+            }).join(', ');
+
+            return message.reply(`🎉 **Đã chọn thành công 3 chú mèo hoạt động:**\n${selectedNames}`);
+        }
+
+        // TÚI ĐỒ (Cập nhật hiển thị trạng thái [ĐANG CHỌN])
         if (command === 'tui' || command === 't') {
             const user = activeUser;
             if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
 
             user.lastActiveAt = Date.now();
             let catList = 'Chưa có con mèo nào.';
+
+            const uniqueSpecies = new Set(user.cats.map(c => cleanCatName(c.name)));
+            const needSelection = uniqueSpecies.size >= 4;
+
             if (user.cats.length > 0) {
-                const groupedCats = {};
-                user.cats.forEach(c => {
+                catList = user.cats.map((c, i) => {
                     const info = getCatInfo(c.name);
                     const lvl = c.level || 1;
                     const xp = c.xp || 0;
-                    const key = `${info.cleanName}_Lv${lvl}_XP${xp}`;
+                    const reqXP = getRequiredXP(lvl);
+                    const xpDisplay = reqXP === 'MAX' ? 'MAX XP' : `${xp}/${reqXP} XP`;
+                    const isSelected = Array.isArray(user.selectedCats) && user.selectedCats.includes(i);
+                    const selectedTag = (needSelection && isSelected) ? ' ✨ **[ĐANG CHỌN]**' : '';
 
-                    if (!groupedCats[key]) {
-                        groupedCats[key] = {
-                            name: info.cleanName,
-                            emoji: info.emoji,
-                            level: lvl,
-                            xp: xp,
-                            count: 1
-                        };
-                    } else {
-                        groupedCats[key].count += 1;
-                    }
-                });
-
-                catList = Object.values(groupedCats).map((item, i) => {
-                    const reqXP = getRequiredXP(item.level);
-                    const xpDisplay = reqXP === 'MAX' ? 'MAX XP' : `${item.xp}/${reqXP} XP`;
-                    const countStr = item.count > 1 ? ` - **${item.count} con**` : '';
-                    return `**${i + 1}.**${item.emoji} **${item.name}** (Lv.${item.level} - ${xpDisplay})${countStr}`;
+                    return `**${i + 1}.**${info.emoji} **${info.cleanName}** (Lv.${lvl} - ${xpDisplay})${selectedTag}`;
                 }).join('\n');
+
+                if (needSelection) {
+                    catList += `\n\n💡 *Bạn đang có ${uniqueSpecies.size} loài mèo khác nhau! Dùng \`${currentPrefix}select <STT1> <STT2> <STT3>\` để chọn 3 con kiếm xu.*`;
+                }
             }
 
             let invText = '';
@@ -541,7 +718,8 @@ client.on('messageCreate', async (message) => {
             }
             if (!invText) invText = 'Túi đồ trống.';
 
-            const readyPlots = user.plots.filter(p => Date.now() >= p.harvestAt).length;
+            const now = Date.now();
+            const readyPlots = user.plots.filter(p => getPlantStatus(p, now).ready).length;
             const growingPlots = user.plots.length - readyPlots;
 
             const embed = new EmbedBuilder()
@@ -558,7 +736,7 @@ client.on('messageCreate', async (message) => {
             return message.channel.send({ embeds: [embed] });
         }
 
-        // SHOP
+        // SHOP (Cập nhật loại cây mới)
         if (command === 'shop' || command === 's') {
             const user = activeUser;
             const userCoins = user ? user.coins : 0;
@@ -573,7 +751,15 @@ client.on('messageCreate', async (message) => {
                 .setColor(0x98FB98)
                 .setImage('https://i.pinimg.com/originals/3a/a4/6f/3aa46f5701fc6ed92234ea0a9f86e2cd.gif')
                 .addFields(
-                    { name: '🌱 Hạt Giống', value: `• \`hatgiong_lua\`: 10 ${COIN_EMOJI}\n• \`hatgiong_tra\`: 30 ${COIN_EMOJI}\n• \`hatgiong_mia\`: 55 ${COIN_EMOJI}\n• \`hatgiong_caphe\`: 100 ${COIN_EMOJI}\n• \`hatgiong_tre\`: 200 ${COIN_EMOJI}` },
+                    { 
+                        name: '🌱 Hạt Giống', 
+                        value: `• \`hatgiong_lua\`: 10 ${COIN_EMOJI} (🌾 Lúa - 20s)\n` +
+                               `• \`hatgiong_carot\`: 15 ${COIN_EMOJI} (${PLANTS.carot.seedEmoji} Cà Rốt - 1m)\n` +
+                               `• \`hatgiong_tra\`: 30 ${COIN_EMOJI} (${PLANTS.tra.seedEmoji} Cây Trà - 8m vĩnh viễn)\n` +
+                               `• \`hatgiong_ot\`: 50 ${COIN_EMOJI} (${PLANTS.ot.seedEmoji} Cây Ớt - 10m vĩnh viễn)\n` +
+                               `• \`hatgiong_caphe\`: 100 ${COIN_EMOJI} (${PLANTS.caphe.seedEmoji} Cây Cà Phê - 10m vĩnh viễn)\n` +
+                               `• \`hatgiong_suplo\`: 200 ${COIN_EMOJI} (${PLANTS.suplo.cropEmoji} Súp Lơ - 7m)` 
+                    },
                     { name: '🐟 Thức Ăn', value: `• \`thucan\`: 30 ${COIN_EMOJI} (+15 XP cho mèo)` }
                 );
 
@@ -592,7 +778,13 @@ client.on('messageCreate', async (message) => {
             if (!item || quantity <= 0 || isNaN(quantity)) return message.reply(`❌ Cú pháp: \`${currentPrefix}mua <tên_món> <số_lượng>\``);
 
             const prices = {
-                hatgiong_lua: 10, hatgiong_tra: 30, hatgiong_mia: 55, hatgiong_caphe: 100, hatgiong_tre: 200, thucan: 30
+                hatgiong_lua: 10,
+                hatgiong_carot: 15,
+                hatgiong_tra: 30,
+                hatgiong_ot: 50,
+                hatgiong_caphe: 100,
+                hatgiong_suplo: 200,
+                thucan: 30
             };
 
             if (!prices[item]) return message.reply('❌ Vật phẩm không có trong cửa hàng!');
@@ -608,7 +800,7 @@ client.on('messageCreate', async (message) => {
             return message.reply(`🛒 Bạn đã mua thành công **${quantity}x${item}** với giá **${total}**${COIN_EMOJI}!`);
         }
 
-        // 💰 RÚT TIỀN TỪ MÈO (TÍNH NĂNG ONLINE/OFFLINE MỚI)
+        // 💰 RÚT TIỀN TỪ MÈO (ÁP DỤNG SỬA ĐỔI 1 & SỬA ĐỔI 2)
         if (command === 'kiemtien' || command === 'kt') {
             const user = activeUser;
             if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
@@ -627,13 +819,10 @@ client.on('messageCreate', async (message) => {
             let offlineTimeSec = 0;
 
             if (now <= offlineStartTime) {
-                // Toàn bộ thời gian tích lũy là Online
                 onlineTimeSec = (now - lastClaim) / 1000;
             } else if (lastClaim >= offlineStartTime) {
-                // Toàn bộ thời gian tích lũy là Offline
                 offlineTimeSec = (now - lastClaim) / 1000;
             } else {
-                // Tích lũy gồm cả khoảng Online và Offline
                 onlineTimeSec = (offlineStartTime - lastClaim) / 1000;
                 offlineTimeSec = (now - offlineStartTime) / 1000;
             }
@@ -642,18 +831,51 @@ client.on('messageCreate', async (message) => {
                 return message.reply('⏰ Đàn mèo chưa tích lũy đủ xu, quay lại sau ít giây nữa!');
             }
 
-            // Tính tổng tốc độ kiếm xu chuẩn theo từng loại mèo (công thức mới: Xu/phút và 1.25x / level)
-            let totalIncomePerSec = 0;
+            // --- XỬ LÝ SỬA ĐỔI 2: CHỌN MÈO KHI CÓ TỪ 4 LOÀI TRỞ LÊN ---
+            const uniqueSpecies = new Set(user.cats.map(c => cleanCatName(c.name)));
+            let catsToCalculate = [];
 
-            user.cats.forEach(c => {
+            if (uniqueSpecies.size >= 4) {
+                // Phải chọn đúng 3 con từ selectedCats
+                const validSelected = (user.selectedCats || []).filter(idx => idx >= 0 && idx < user.cats.length);
+                if (validSelected.length < 3) {
+                    return message.reply(`⚠️ Bạn đang có **${uniqueSpecies.size} loài mèo khác nhau**! Hãy dùng lệnh \`${currentPrefix}select <STT1> <STT2> <STT3>\` để chọn đúng 3 chú mèo ra trận trước khi nhận tiền.`);
+                }
+                catsToCalculate = validSelected.map(idx => user.cats[idx]);
+            } else {
+                // Dưới 4 loài: Lấy toàn bộ danh sách mèo
+                catsToCalculate = [...user.cats];
+            }
+
+            // --- XỬ LÝ SỬA ĐỔI 1: KHÔNG STACK TRÙNG LOÀI (LẤY CON LEVEL CAO NHẤT CỦA MỖI LOÀI) ---
+            const bestCatsMap = new Map();
+            catsToCalculate.forEach(c => {
+                const info = getCatInfo(c.name);
+                const speciesName = info.cleanName;
+                const currentLevel = c.level || 1;
+                const currentXP = c.xp || 0;
+
+                if (!bestCatsMap.has(speciesName)) {
+                    bestCatsMap.set(speciesName, c);
+                } else {
+                    const existing = bestCatsMap.get(speciesName);
+                    const existingLevel = existing.level || 1;
+                    const existingXP = existing.xp || 0;
+
+                    if (currentLevel > existingLevel || (currentLevel === existingLevel && currentXP > existingXP)) {
+                        bestCatsMap.set(speciesName, c);
+                    }
+                }
+            });
+
+            // Tính tổng tốc độ kiếm xu từ các chú mèo đại diện duy nhất
+            let totalIncomePerSec = 0;
+            bestCatsMap.forEach(c => {
                 const info = getCatInfo(c.name);
                 const catDef = CAT_TYPES.find(ct => info.cleanName.toLowerCase().includes(ct.name.toLowerCase()) || ct.name.toLowerCase().includes(info.cleanName.toLowerCase())) || CAT_TYPES[0];
                 const catLvl = Math.min(MAX_CAT_LEVEL, c.level || 1);
                 
-                // Thu nhập gốc mỗi giây = incomePerMin / 60
                 const baseIncomePerSec = catDef.incomePerMin / 60;
-                
-                // Nhân 1.25x cho mỗi cấp vượt qua cấp 1
                 const levelMultiplier = Math.pow(1.25, catLvl - 1);
                 
                 totalIncomePerSec += (baseIncomePerSec * levelMultiplier);
@@ -669,7 +891,7 @@ client.on('messageCreate', async (message) => {
 
             user.coins += totalEarned;
             user.lastClaimCatCoins = now;
-            user.lastActiveAt = now; // Reset lại trạng thái Online
+            user.lastActiveAt = now;
             await user.save();
 
             let offlineNote = offlineTimeSec > 0 ? ` *(Đã giảm 1/2 xu trong khoảng thời gian Offline)*` : '';
@@ -738,7 +960,7 @@ client.on('messageCreate', async (message) => {
             const plantKey = args[0]?.toLowerCase();
             const count = parseInt(args[1]) || 1;
 
-            if (!PLANTS[plantKey]) return message.reply('❌ Loại cây không hợp lệ! Gồm: `lua`, `tra`, `mia`, `caphe`, `tre`.');
+            if (!PLANTS[plantKey]) return message.reply('❌ Loại cây không hợp lệ! Gồm: `lua`, `carot`, `tra`, `ot`, `caphe`, `suplo`.');
 
             const plant = PLANTS[plantKey];
             const currentSeed = user.inventory[plant.seedItem] || 0;
@@ -752,7 +974,7 @@ client.on('messageCreate', async (message) => {
             const now = Date.now();
 
             for (let i = 0; i < count; i++) {
-                user.plots.push({ plantKey, plantedAt: now, harvestAt: now + plant.timeMs });
+                user.plots.push({ plantKey, plantedAt: now, stageIndex: 0 });
             }
 
             updateQuestProgress(user, 'plant', count);
@@ -763,7 +985,7 @@ client.on('messageCreate', async (message) => {
             return message.reply(`🌱 Đã trồng thành công **${count}x${plant.name}**! Gõ \`${currentPrefix}vuon\` để xem tiến độ.`);
         }
 
-        // THU HOẠCH
+        // THU HOẠCH (CẬP NHẬT CƠ CHẾ CÂY VĨNH VIỄN)
         if (command === 'thuhoach' || command === 'th') {
             const user = activeUser;
             if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
@@ -772,19 +994,36 @@ client.on('messageCreate', async (message) => {
             if (user.plots.length === 0) return message.reply('🌱 Bạn chưa trồng cây nào!');
 
             const now = Date.now();
-            const readyPlots = user.plots.filter(p => now >= p.harvestAt);
-
-            if (readyPlots.length === 0) return message.reply('⏳ Chưa có cây nào chín để thu hoạch!');
-
+            let harvestedCount = 0;
             const harvestedSummary = {};
-            readyPlots.forEach(p => {
-                const cropItem = PLANTS[p.plantKey].cropItem;
-                harvestedSummary[cropItem] = (harvestedSummary[cropItem] || 0) + 1;
-                user.inventory[cropItem] = (user.inventory[cropItem] || 0) + 1;
+            const remainingPlots = [];
+
+            user.plots.forEach(plot => {
+                const plantDef = PLANTS[plot.plantKey];
+                if (!plantDef) return;
+
+                const status = getPlantStatus(plot, now);
+
+                if (status.ready) {
+                    harvestedCount++;
+                    const cropItem = plantDef.cropItem;
+                    harvestedSummary[cropItem] = (harvestedSummary[cropItem] || 0) + 1;
+                    user.inventory[cropItem] = (user.inventory[cropItem] || 0) + 1;
+
+                    // Nếu là cây vĩnh viễn: Lùi về giai đoạn trước đó để tiếp tục sinh trưởng
+                    if (plantDef.permanent) {
+                        plot.plantedAt = now;
+                        plot.stageIndex = plantDef.regrowStage;
+                        remainingPlots.push(plot);
+                    }
+                } else {
+                    remainingPlots.push(plot);
+                }
             });
 
-            user.plots = user.plots.filter(p => now < p.harvestAt);
+            if (harvestedCount === 0) return message.reply('⏳ Chưa có cây nào chín để thu hoạch!');
 
+            user.plots = remainingPlots;
             user.markModified('inventory');
             user.markModified('plots');
             await user.save();
@@ -795,6 +1034,27 @@ client.on('messageCreate', async (message) => {
             }
 
             return message.reply(resultMsg);
+        }
+
+        // LỆNH HỦY/NHỔ CÂY VĨNH VIỄN (!huy / !nhocay)
+        if (command === 'huy' || command === 'nhocay') {
+            const user = activeUser;
+            if (!user) return message.reply('❌ Lỗi tải dữ liệu!');
+
+            user.lastActiveAt = Date.now();
+            const plotIndex = parseInt(args[0]) - 1;
+
+            if (isNaN(plotIndex) || plotIndex < 0 || plotIndex >= user.plots.length) {
+                return message.reply(`❌ Cú pháp: \`${currentPrefix}huy <số_ô_đất>\` (Ví dụ: \`${currentPrefix}huy 1\`)`);
+            }
+
+            const removedPlot = user.plots.splice(plotIndex, 1)[0];
+            const plantDef = PLANTS[removedPlot.plantKey];
+
+            user.markModified('plots');
+            await user.save();
+
+            return message.reply(`🧹 Đã nhổ bỏ cây **${plantDef ? plantDef.name : 'không rõ'}** tại ô số **${plotIndex + 1}**, ô đất hiện đã trống!`);
         }
 
         // BÁN NÔNG SẢN
@@ -809,7 +1069,7 @@ client.on('messageCreate', async (message) => {
             if (!item || quantity <= 0) return message.reply(`❌ Cú pháp: \`${currentPrefix}ban <tên_món> <số_lượng>\``);
 
             const sellPrices = {
-                lua: 18, la_tra: 55, cay_mia: 100, hat_caphe: 180, than_tre: 360,
+                lua: 18, carot: 35, la_tra: 55, trai_ot: 110, hat_caphe: 180, suplo: 420,
                 tradao: 600, caphesua: 400, nuocmia: 250
             };
 
